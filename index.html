@@ -345,6 +345,7 @@ html,body{overscroll-behavior:none;-webkit-touch-callout:none;-webkit-tap-highli
   #cam{right:max(8px,env(safe-area-inset-right))}
   #title{padding-left:max(22px,env(safe-area-inset-left));padding-right:max(22px,env(safe-area-inset-right))}
 }
+.t-menu .t-safe{font-size:13px!important;letter-spacing:.06em!important;color:var(--muted)!important;margin-top:8px;text-transform:none!important;font-family:var(--f-ui)!important}
 .t-menu .t-g3 em{font:600 10.5px/1 var(--f-mono);font-style:normal;letter-spacing:.12em;text-transform:uppercase;color:#1b1204;background:var(--hazard);padding:4px 7px;border-radius:6px;margin-left:12px;vertical-align:middle}
 </style>
 </head>
@@ -397,6 +398,7 @@ html,body{overscroll-behavior:none;-webkit-touch-callout:none;-webkit-tap-highli
           <button data-t="cartes">Cartes</button>
           <button data-t="reglages">Réglages</button>
           <button data-t="quit" id="t-quit" hidden>Quitter</button>
+          <button data-t="safe" id="t-safe" class="t-safe">Écran noir ? Graphismes simplifiés</button>
         </nav>
       </div>
       <div class="t-right">
@@ -8458,7 +8460,7 @@ function r3Post(){
   GRADE3.uniforms.uTint.value=new THREE.Vector3(1,1,1); GRADE3.uniforms.uLift.value=new THREE.Vector3(0,0,0);
   const rt=new THREE.WebGLRenderTarget(4,4,{type:THREE.HalfFloatType,samples:4});
   const C=new T3.EffectComposer(rd,rt); R3S.comp=C;
-  R3S.pRender=new T3.RenderPass(R3S.scene,R3S.cam); C.addPass(R3S.pRender);
+  R3S.pRender=new T3.RenderPass(R3S.scene,R3S.cam); C.addPass(R3S.pRender); C.addPass(sanePass());
   try{R3S.pAO=new T3.GTAOPass(R3S.scene,R3S.cam,4,4); R3S.pAO.blendIntensity=.85; try{R3S.pAO.updateGtaoMaterial({radius:16,distanceExponent:1.4,thickness:8,scale:1.2,samples:12});}catch(_){} C.addPass(R3S.pAO);}catch(e){R3S.pAO=null; console.warn('GTAO',e);}
   R3S.pBloom=new T3.UnrealBloomPass(new THREE.Vector2(4,4),.6,.55,.85); C.addPass(R3S.pBloom);
   R3S.pOut=new T3.OutputPass(); C.addPass(R3S.pOut);
@@ -8493,7 +8495,7 @@ function r3Render(){
   const G=R3S.pGrade.uniforms; G.uTime.value=S.time; G.uGrain.value=QL.lvl>=2?.032:.0; G.uCA.value=QL.lvl>=2?.0016:0;
   R3S.rd.toneMappingExposure=(th.exp||1)*(1+Math.min(1.2,S.light*.35));
   if(QL.lvl>=1) R3S.comp.render(); else {R3S.rd.setRenderTarget(null); R3S.rd.render(R3S.scene,R3S.cam);}
-  R3.frame++;
+  R3.frame++; glWatch();
 }
 
 /* ---------- Ambiances 3D par carte ---------- */
@@ -9098,9 +9100,21 @@ rg=mix(rg,.5-tz*.14+(n2-.5)*.1+lips*-.12,sk); rg=mix(rg,rg*(.9+.2*strand),hairW)
 gH=(sk*(n4*.022+n3*.018)+clothW*n4*.03+hairW*strand*.05+beardW*bst*.06)*far;
 gSkin=sk; gThin=sk*clamp(blb2(bp,vec3(0.,112.,8.3),vec3(1.8,3.4,1.6))+blb(bp,vec3(10.1,109.8,0.),vec3(1.5,1.5,1.7))+smoothstep(61.,56.,bp.y)*.6,0.,1.);
 vec3 aoC=mix(vec3(vAo),pow(vec3(vAo),vec3(.55,1.,1.2)),sk);
-vec4 diffuseColor = vec4( pc*aoC, opacity );
+vec4 diffuseColor = vec4( clamp(pc*aoC,0.,1.), opacity ); rg=clamp(rg,.08,1.);
 `;
+function humMatSafe(){
+  const m=new THREE.MeshStandardMaterial({roughness:.7,metalness:0}), U={uPal:{value:Array.from({length:8},()=>new THREE.Color())},uRgh:{value:new Array(8).fill(.7)},uBrow:{value:new THREE.Color()},uSkinF:{value:new THREE.Vector3()},uSkinOn:{value:1},uSeed:{value:1}};
+  m.userData.U=U;
+  m.onBeforeCompile=sh=>{Object.assign(sh.uniforms,U);
+    sh.vertexShader=sh.vertexShader.replace('#include <common>','#include <common>\nattribute vec4 regA; attribute vec4 regB; attribute float ao; varying vec4 vRA; varying vec4 vRB; varying float vAo;').replace('#include <begin_vertex>','#include <begin_vertex>\nvRA=regA; vRB=regB; vAo=ao;');
+    sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform vec3 uPal[8]; uniform float uRgh[8]; varying vec4 vRA; varying vec4 vRB; varying float vAo;')
+      .replace('vec4 diffuseColor = vec4( diffuse, opacity );','float ws=dot(vRA,vec4(1.))+dot(vRB,vec4(1.))+1e-4; vec3 pc=(uPal[0]*vRA.x+uPal[1]*vRA.y+uPal[2]*vRA.z+uPal[3]*vRA.w+uPal[4]*vRB.x+uPal[5]*vRB.y+uPal[6]*vRB.z+uPal[7]*vRB.w)/ws; float rg=(uRgh[0]*vRA.x+uRgh[1]*vRA.y+uRgh[2]*vRA.z+uRgh[3]*vRA.w+uRgh[4]*vRB.x+uRgh[5]*vRB.y+uRgh[6]*vRB.z+uRgh[7]*vRB.w)/ws; vec4 diffuseColor = vec4( pc*vAo, opacity );')
+      .replace('float roughnessFactor = roughness;','float roughnessFactor = clamp(rg,.05,1.);');};
+  m.customProgramCacheKey=()=>'hum-safe';
+  return m;
+}
 function humMat(){
+  if(S.safe) return humMatSafe();
   const phys=QL.lvl>=1, m=phys?new THREE.MeshPhysicalMaterial({roughness:.7,metalness:0,ior:1.4,specularIntensity:.85,sheen:.35,sheenRoughness:.6,sheenColor:new THREE.Color(.55,.47,.45)}):new THREE.MeshStandardMaterial({roughness:.7,metalness:0});
   const U={uPal:{value:Array.from({length:8},()=>new THREE.Color())},uRgh:{value:new Array(8).fill(.7)},uBrow:{value:new THREE.Color(.2,.14,.1)},uSkinF:{value:new THREE.Vector3(1,0,0)},uSkinOn:{value:1},uSeed:{value:1}};
   m.userData.U=U;
@@ -9117,7 +9131,7 @@ function humMat(){
       .replace('float roughnessFactor = roughness;','float roughnessFactor = rg;')
       .replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
 	{ vec3 sX=dFdx(-vViewPosition), sY=dFdy(-vViewPosition); float dHx=dFdx(gH), dHy=dFdy(gH); vec3 R1=cross(sY,normal), R2=cross(normal,sX); float det=dot(sX,R1)*faceDirection;
-	  if(abs(det)>1e-9){ vec3 grad=sign(det)*(dHx*R1+dHy*R2); normal=normalize(abs(det)*normal-grad); } }`);};
+	  if(abs(det)>1e-9){ vec3 grad=sign(det)*(dHx*R1+dHy*R2); vec3 nn=abs(det)*normal-grad; if(dot(nn,nn)>1e-12&&!any(isnan(nn))) normal=normalize(nn); } }`);};
   m.customProgramCacheKey=()=>'hum-v3'+(phys?'p':'s');
   return m;
 }
@@ -9337,6 +9351,63 @@ function r3PoolTick(){
     for(const L of e.lobes) decPut('pool',P.x+Math.cos(L.a)*R*L.d,P.y,e.z+Math.sin(L.a)*R*L.d*.8,0,-1,R*L.k*2,R*L.k*1.7,col,L.r,L.i);
     if(e.z+R*.82>ZF-1&&e.drips.length<3&&Math.random()<.03){const dx=P.x+rnd(-R*.6,R*.6); e.drips.push({x:dx,L:2,i:decPut('drip',dx,P.y+2,ZF+.3,0,0,3,4,col,0)});}
     for(const d of e.drips){if(d.L<34) d.L+=.22; decPut('drip',d.x,P.y+d.L*.45,ZF+.35,0,0,3.4,d.L,col,0,d.i);}}
+}
+
+/* =====================================================================
+   Sécurité d'affichage : passe anti-NaN, détection d'écran noir,
+   mode graphique simplifié automatique, messages d'erreur visibles
+   ===================================================================== */
+const SANE3={uniforms:{tDiffuse:{value:null}},
+  vertexShader:'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+  fragmentShader:'uniform sampler2D tDiffuse; varying vec2 vUv; void main(){ vec4 c=texture2D(tDiffuse,vUv); if(any(isnan(c))||any(isinf(c))) c=vec4(0.,0.,0.,1.); gl_FragColor=vec4(clamp(c.rgb,0.,60.),c.a); }'};
+function sanePass(){ const p=new T3.ShaderPass(SANE3); p.needsSwap=true; return p; }
+const GW={t:0,bad:0,ok:0,done:false,buf:null,stage:0,errs:new Set()};
+function safeLevel(){ try{return +(localStorage.getItem('bl-safe')||0);}catch(_){return 0;} }
+function safeBoot(){ const L=safeLevel(); GW.stage=L; if(L>=1){S.safe=1; QL.mode='basse'; QL.lvl=0; S.qual='basse';} if(L>=2){R3.on=false; R3.failed=true;} }
+function humRebuildMats(){
+  try{ for(const [,o] of HUM.map){R3S.dyn.remove(o.mesh); o.mat.dispose();} HUM.map.clear(); }catch(_){}
+  try{ if(G3.hum) for(const [,o] of G3.hum){G3.dyn.remove(o.mesh); o.mat.dispose();} if(G3.hum) G3.hum.clear(); }catch(_){}
+}
+function glSafe(reason){
+  GW.stage=Math.max(GW.stage,safeLevel())+1; try{localStorage.setItem('bl-safe',String(Math.min(2,GW.stage)));}catch(_){}
+  GW.bad=0; GW.ok=0; GW.t=0;
+  if(GW.stage<=1){ S.safe=1; setQual('basse'); humRebuildMats(); R3S.lvl=-1; R3S.w=0; if(G3.ready){G3.lvl=-1; G3.w=0;}
+    errBanner('Écran noir détecté : graphismes simplifiés activés pour votre appareil.'+(reason?' ('+reason+')':''),'ok'); }
+  else { GW.done=true; if(G3.on) g3Exit(); R3.on=false; R3.failed=true; if(R3S.canvas) R3S.canvas.style.display='none';
+    errBanner('Votre appareil n’arrive pas à afficher la 3D : le jeu passe en dessin 2D. Bouton « Graphismes » du menu pour réessayer.','bad'); }
+  if(typeof renderTitle==='function'&&TITLE.on) renderTitle();
+}
+/* lit quelques pixels de l'image affichée : tout noir = rendu en panne */
+function glWatch(){
+  if(!GW.hooked&&R3S.canvas){ GW.hooked=1; R3S.canvas.addEventListener('webglcontextlost',()=>{ try{localStorage.setItem('bl-safe',String(Math.max(1,safeLevel())));}catch(_){} if(G3.on) g3Exit();
+      errBanner('Le téléphone a coupé la 3D (mémoire graphique pleine). Fermez et rouvrez le jeu : il démarrera en graphismes simplifiés.','bad'); }); }
+  if(GW.done||document.hidden) return; GW.t++; if(GW.t<20||GW.t%40!==0) return;
+  try{ const rd=R3S.rd, gl=rd.getContext(); if(gl.isContextLost&&gl.isContextLost()) return; rd.setRenderTarget(null);
+    const w=gl.drawingBufferWidth, h=gl.drawingBufferHeight, b=GW.buf||(GW.buf=new Uint8Array(4)); let mx=0, mn=255;
+    for(const fx of [.2,.5,.8]) for(const fy of [.3,.55,.8]){ gl.readPixels((w*fx)|0,(h*fy)|0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,b); const v=Math.max(b[0],b[1],b[2]); mx=Math.max(mx,v); mn=Math.min(mn,v); }
+    GW.last=[mn,mx];
+    if(mx<=20&&mx-mn<=12){ GW.ok=0; if(++GW.bad>=2) glSafe(); } else { GW.bad=0; GW.ok++; }
+  }catch(e){ GW.done=true; }
+}
+/* messages visibles (l'iPhone n'a pas de console) */
+function errBanner(msg,kind){
+  let el=document.getElementById('errbar');
+  if(!el){ el=document.createElement('div'); el.id='errbar'; el.setAttribute('role','status');
+    el.style.cssText='position:fixed;left:50%;top:max(10px,env(safe-area-inset-top));transform:translateX(-50%);z-index:99;max-width:min(560px,calc(100% - 24px));padding:10px 14px;border-radius:12px;font:500 13px/1.35 system-ui,sans-serif;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.5);pointer-events:none;transition:opacity .3s';
+    document.body.appendChild(el); }
+  el.style.background=kind==='ok'?'rgba(20,90,60,.95)':kind==='bad'?'rgba(150,30,30,.95)':'rgba(40,46,56,.95)'; el.textContent=msg; el.style.opacity='1';
+  clearTimeout(GW.bt); GW.bt=setTimeout(()=>{el.style.opacity='0';},kind==='bad'?14000:9000);
+}
+function frameErr(err){
+  const m=String(err&&err.message||err).slice(0,140); if(GW.errs.has(m)) return; GW.errs.add(m); console.error(err);
+  if(GW.errs.size<=3) errBanner('Erreur du jeu : '+m,'bad');
+}
+addEventListener('error',e=>{ if(e&&e.message) frameErr(e.message); });
+addEventListener('unhandledrejection',e=>{ if(e&&e.reason) frameErr(e.reason); });
+{ const ce=console.error.bind(console); console.error=function(...a){ try{const m=String(a[0]||''); if(/Shader Error|WebGLProgram|Framebuffer|INVALID_/.test(m)&&!S.safe&&!GW.shaderErr){GW.shaderErr=1; setTimeout(()=>glSafe('shader'),0);}}catch(_){} return ce(...a); }; }
+function safeToggle(){
+  if(safeLevel()>0||S.safe){ try{localStorage.setItem('bl-safe','0'); localStorage.setItem('bl-qual','auto');}catch(_){} location.reload(); }
+  else { try{localStorage.setItem('bl-safe','1');}catch(_){} location.reload(); }
 }
 
 /* =====================================================================
@@ -9563,7 +9634,7 @@ function g3Init(){
   G3.spots=[]; for(let i=0;i<4;i++){const L=new THREE.SpotLight(0xffffff,0,1600,.7,.6,1.5); L.castShadow=i<2; if(L.castShadow){L.shadow.mapSize.set(1024,1024); L.shadow.bias=-.0006; L.shadow.camera.near=20; L.shadow.camera.far=1600;} s.add(L,L.target); G3.spots.push(L);}
   G3.pts=[]; for(let i=0;i<6;i++){const L=new THREE.PointLight(0xffffff,0,600,2); s.add(L); G3.pts.push(L);}
   const rd=R3S.rd, rt=new THREE.WebGLRenderTarget(4,4,{type:THREE.HalfFloatType,samples:4}), C=new T3.EffectComposer(rd,rt);
-  C.addPass(new T3.RenderPass(s,cam)); try{G3.pAO=new T3.GTAOPass(s,cam,4,4); G3.pAO.blendIntensity=.8; try{G3.pAO.updateGtaoMaterial({radius:14,distanceExponent:1.4,thickness:8,scale:1.2,samples:12});}catch(_){} C.addPass(G3.pAO);}catch(_){G3.pAO=null;}
+  C.addPass(new T3.RenderPass(s,cam)); C.addPass(sanePass()); try{G3.pAO=new T3.GTAOPass(s,cam,4,4); G3.pAO.blendIntensity=.8; try{G3.pAO.updateGtaoMaterial({radius:14,distanceExponent:1.4,thickness:8,scale:1.2,samples:12});}catch(_){} C.addPass(G3.pAO);}catch(_){G3.pAO=null;}
   G3.pBloom=new T3.UnrealBloomPass(new THREE.Vector2(4,4),.5,.5,.85); C.addPass(G3.pBloom); C.addPass(new T3.OutputPass()); G3.pGrade=new T3.ShaderPass(GRADE3); C.addPass(G3.pGrade); G3.comp=C;
   // formes instanciées : yeux, blindages, capsules des corps démembrés, trous
   const geo={s:new THREE.SphereGeometry(1,18,12),c:new THREE.CylinderGeometry(.9,1,1,14),b:new T3.RoundedBoxGeometry(1,1,1,2,.16)};
@@ -10224,7 +10295,7 @@ function g3Render(el){
   G3.pts.forEach((Pl,k)=>{const L=G3L[k]; if(!L){Pl.intensity=0; return;} Pl.position.set(L.x,L.y,L.z); Pl.color.set(L.col); Pl.distance=L.R*1.6; Pl.intensity=L.i*L.R*L.R*.55;}); G3L.length=0;
   const U=G3.pGrade.uniforms; U.uTime.value=G3.t; U.uGrain.value=QL.lvl>=2?.03:0; U.uCA.value=QL.lvl>=2?.0012:0; U.uVig.value=.32+G3.ads*.25;
   rd.toneMappingExposure=(M.exp||th.exp||1);
-  if(QL.lvl>=1) G3.comp.render(); else {rd.setRenderTarget(null); rd.render(G3.scene,cam);}
+  if(QL.lvl>=1) G3.comp.render(); else {rd.setRenderTarget(null); rd.render(G3.scene,cam);} glWatch();
 }
 /* ---------- Surimpression 2D : textes de dégâts, lunette, éblouissement ---------- */
 const _pv=THREE?new THREE.Vector3():null;
@@ -10544,6 +10615,7 @@ $('#title').addEventListener('click',e=>{
   const b=e.target.closest('[data-t]'); if(!b) return; const t=b.dataset.t;
   if(t==='play') g3TitlePlay();
   else if(t==='profil'){ g3Exit(); showTitle(false); }
+  else if(t==='safe') safeToggle();
   else if(t==='quit') window.close();
   else {showTitle(false); openCat(t);}
 });
@@ -10553,7 +10625,7 @@ $('#b-menu').onclick=()=>showTitle(true);
     const r=_st(on); if(!on&&G3.on&&G3.ui){ G3.ui.hidden=false; g3HudMap(); } if(G3.ui) g3Hint(); return r; };
   const _rt=renderTitle; renderTitle=function(){ _rt(); const c=$('#t-mapc');
     if(G3.on){ c.style.display='none'; const M=G3MAPS[G3.map]; $('#t-mapname').textContent=M.nom; $('#t-mapdesc').textContent=M.desc||''; $('#t-maps').innerHTML=Object.entries(G3MAPS).map(([id,m])=>`<button data-g3map="${id}" aria-pressed="${id===G3.map}">${esc(m.nom)}</button>`).join(''); }
-    else c.style.display=''; $('#t-r3').textContent=R3.failed?'Rendu 2D (WebGL indisponible)':'Moteur 3D temps réel · WebGL 2 · Three.js'; };
+    else c.style.display=''; { const b=$('#t-safe'); if(b) b.textContent=(S.safe||safeLevel()>0)?'Graphismes simplifiés · revenir au normal':'Écran noir ? Graphismes simplifiés'; } $('#t-r3').textContent=R3.failed?'Rendu 2D (WebGL indisponible)':'Moteur 3D temps réel · WebGL 2 · Three.js'; };
   $('#title').addEventListener('click',e=>{ const b=e.target.closest('[data-g3map]'); if(b){ g3Build(b.dataset.g3map); G3.built=G3.map; renderTitle(); } });
   const _lm=loadMap; loadMap=function(id){ if(G3.on){ g3Exit(); setTimeout(()=>toast('Vue de profil : '+(MAPS[id]||MAPS.stand).nom+'. Le jeu en 3D est dans le menu (Échap).'),50); } return _lm(id); };
   const _th=takeHand; takeHand=function(cat,id){ const pv=S.hand, had=S.recent.some(q=>q.cat===cat&&q.id===id); const r=_th(cat,id); if(pv&&(pv.cat!==cat||pv.id!==id)){G3.prevHand=pv; G3.swap=1; G3.cool=Math.max(G3.cool||0,.22);} g3Bar(); if(!had&&cat!=='cartes'&&cat!=='reglages') setTimeout(()=>toast(`${itemName(cat,id)} ajouté à l’inventaire (${S.recent.findIndex(q=>q.cat===cat&&q.id===id)+1}).`),30); if(G3.on){ g3Hud(); if(cat==='perso') toast('Cliquez (ou E) pour placer ce personnage là où vous visez.'); else if(cat==='gadgets'||(cat==='outils'&&id!=='main'&&id!=='gomme')) toast('Les gadgets et pièges arrivent bientôt en mode 3D.'); } return r; };
@@ -10584,21 +10656,21 @@ function start(data){
     if(data.hand&&CATMAP[data.hand.cat]) S.hand=data.hand;}
   if(hot&&typeof hot.snapshot==='function'){try{hot.snapshot(()=>({weapon:S.weapon,melee:S.melee,explo:S.explo,gadget:S.gadget,soin:S.soin,perso:S.perso,spawn:S.spawn,mode:S.mode,tenue:S.tenue,sang:S.sang,map:S.map,grav:S.grav,wallMat:S.wallMat,loadout:S.loadout,recent:S.recent,hand:S.hand}));}catch(_){}}
   if(!matchMedia('(pointer: fine)').matches) $('#toast').textContent='Touchez « Catalogue » pour choisir une arme, un personnage, un explosif ou une carte.';
-  invLoad(); makeTextures(); makeTex7(); if(R3.on) r3Init(); resize(); loadMap(S.map);
+  invLoad(); safeBoot(); makeTextures(); makeTex7(); if(R3.on) r3Init(); resize(); loadMap(S.map);
   const hc=S.hand; takeHand(hc.cat,hc.id);
   setTimeout(()=>{ if(!$('#toast').classList.contains('off')) hideToast(); },9000);
-  if(!/[?&]debug/.test(location.search)||/[?&]title/.test(location.search)){ showTitle(true); if(!/[?&]nog3/.test(location.search)) g3Enter(undefined,{bg:true}); }
+  if(!/[?&]debug/.test(location.search)||/[?&]title/.test(location.search)){ showTitle(true); if(!/[?&]nog3/.test(location.search)) try{ g3Enter(undefined,{bg:true}); }catch(err){ frameErr(err); } }
   let last=performance.now(), acc=0, uiT=0;
-  const frame=now=>{
+  const frame=now=>{ try{ frame0(now); }catch(err){ frameErr(err); } requestAnimationFrame(frame); };
+  const frame0=now=>{
     const el=Math.min(.05,(now-last)/1000); last=now; sfxCount=0;
-    if(G3.on){try{if(!G3.manual) g3Frame(el);}catch(err){console.error(err); g3Exit(); toast('Erreur du mode 3D : retour à la vue de profil.');} requestAnimationFrame(frame); return;}
+    if(G3.on){try{if(!G3.manual) g3Frame(el);}catch(err){console.error(err); g3Exit(); frameErr(err);} return;}
     if(!S.paused){acc+=el; let n=0; while(acc>=DT&&n<4){tick(DT);acc-=DT;n++;} if(n===4) acc=0;} else acc=0;
     panKeys(el); if(TITLE.on) titleCam(el); updateCamera(el); draw(); renderMini(); uiT-=el; if(uiT<=0){uiT=.15;renderInsp();renderHud();renderFeed();renderCtx();renderBilan();}
-    requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
 }
-if(/[?&]debug/.test(location.search)) window.__BL={S,G3,g3Enter,g3Exit,g3Fire,g3Throw,g3Build,g3Step,g3Spawn,g3Use,g3Frame,g3AimHit,WEAPONS,MELEE,SOINS,CHARS,bodies,props,solids,gadgets,fx,ropes,cam,gun,get G(){return G},get WW(){return WW},loadMap,takeHand,fire,setQual,QL,showTitle,TITLE,explode,EXPLO,makeProp,flashes,R3,R3S,setR3,walls,liquids};
+if(/[?&]debug/.test(location.search)) window.__BL={S,G3,g3Enter,g3Exit,g3Fire,g3Throw,g3Build,g3Step,g3Spawn,g3Use,g3Frame,g3AimHit,GW,WEAPONS,MELEE,SOINS,CHARS,bodies,props,solids,gadgets,fx,ropes,cam,gun,get G(){return G},get WW(){return WW},loadMap,takeHand,fire,setQual,QL,showTitle,TITLE,explode,EXPLO,makeProp,flashes,R3,R3S,setR3,walls,liquids};
 new ResizeObserver(()=>{ if(W) resize(); }).observe(stage);
 if(hot&&typeof hot.ready==='function') hot.ready(start); else start(hot&&hot.data||{});
 })();

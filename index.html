@@ -387,10 +387,10 @@ html,body{overscroll-behavior:none;-webkit-touch-callout:none;-webkit-tap-highli
       <div class="t-left">
         <div class="t-kick">Bac à sable balistique</div>
         <h2 class="t-logo">Blindage<span>Lab</span></h2>
-        <p class="t-sub">Testez armes, blindages et explosifs sur des mannequins physiques, dans dix environnements en 3D temps réel.</p>
+        <p class="t-sub">Déplacez-vous librement en 3D à la première personne et testez armes, blindages et explosifs sur des mannequins physiques.</p>
         <nav class="t-menu">
-          <button data-t="play" class="pri">Jouer <kbd>Entrée</kbd></button>
-          <button data-t="g3" class="t-g3">Mode 3D <em>Nouveau</em></button>
+          <button data-t="play" class="pri t-g3">Jouer en 3D <em>1re personne</em> <kbd>Entrée</kbd></button>
+          <button data-t="profil">Vue de profil</button>
           <button data-t="armes">Arsenal</button>
           <button data-t="perso">Personnages</button>
           <button data-t="equip">Équipement</button>
@@ -7799,7 +7799,7 @@ function qualTick(el){
   QL.acc+=el; QL.n++;
   if(QL.acc>=2.5){const fps=QL.n/QL.acc; QL.acc=0; QL.n=0;
     if(fps<36&&QL.lvl>0){QL.lvl--; QL.skip=1.5; toast(`Qualité graphique réglée automatiquement sur « ${QLN[QL.lvl]} » pour garder le jeu fluide. Modifiable dans Réglages.`);}
-    else if(fps<22&&r3Usable()&&!R3.auto2d){R3.auto2d=1; R3.on=false; if(R3S.canvas) R3S.canvas.style.display='none'; QL.lvl=1; QL.skip=1.5; toast('Ordinateur trop lent pour la 3D : rendu 2D activé. Vous pouvez revenir à la 3D dans Réglages.');}}
+    else if(false&&fps<22&&r3Usable()&&!R3.auto2d){R3.auto2d=1; R3.on=false; if(R3S.canvas) R3S.canvas.style.display='none'; QL.lvl=1; QL.skip=1.5; toast('Ordinateur trop lent pour la 3D : rendu 2D activé. Vous pouvez revenir à la 3D dans Réglages.');}}
 }
 
 /* ---------- Bruit procédural et textures ---------- */
@@ -9269,7 +9269,7 @@ function r3PoolTick(){
    Unités du jeu : 60 = 1 m ; y vers le haut.
    ===================================================================== */
 const G3={on:false,ready:false,map:'stand3d',rags:[],props:[],proj:[],fx:[],boxes:[],texts:[],t:0,nid:1,
-  pl:{x:0,y:0,z:0,yaw:0,pitch:0,vy:0,ground:true},keys:{},fire:false,aim:false,cool:0,recoil:0,shake:0,locked:false,mv:{x:0,y:0},look:{x:0,y:0}};
+  pl:{x:0,y:0,z:0,yaw:0,pitch:0,vx:0,vy:0,vz:0,eye:98,ground:true},keys:{},fire:false,aim:false,cool:0,recoil:0,shake:0,locked:false,mv:{x:0,y:0},look:{x:0,y:0}};
 const G3P=[[0,112,0],[0,99,0],[0,58,0],[0,95,-15.5],[0,77,-15.5],[.3,58,-15.8],[0,95,15.5],[0,77,15.5],[.3,58,15.8],[0,56,-6.5],[1,31,-6.5],[0,4,-6.5],[0,56,6.5],[1,31,6.5],[0,4,6.5]];
 const G3M=[1.3,1.5,2.2,1,.7,.5,1,.7,.5,1.1,1.1,.9,1.1,1.1,.9], G3R=[9,5,7,4.5,4,3.5,4.5,4,3.5,6,5,4,6,5,4];
 const G3S=[[0,1],[1,2],[1,3],[1,6],[3,6],[3,2],[6,2],[2,9],[2,12],[9,12],[3,9],[6,12],[3,12],[6,9],[3,4],[4,5],[6,7],[7,8],[9,10],[10,11],[12,13],[13,14],[0,3,.4],[0,6,.4]];
@@ -9476,8 +9476,8 @@ function isCutPt(r,i){return (r.cut.tete&&i===0)||(r.cut.brasG&&(i===4||i===5))|
    MODE 3D — scène, cartes, rendu, arme en main, commandes et HUD
    ===================================================================== */
 const G3MAPS={
-  stand3d:{nom:'Stand de tir 3D',theme:'interieur',floor:'beton',key:{d:[.32,1,.22],c:0xffe4c4,i:1.35},hemiI:.62,envI:.5,exp:1.05},
-  plaine3d:{nom:"Terrain d'essai 3D",theme:'ciel',floor:'herbe',exp:.72,fogK:.45,sky:[1.4,1.9,.003,.78,34,200]},
+  stand3d:{nom:'Stand de tir 3D',desc:'Pas de tir couvert de 50 m, néons, cibles et sacs de sable.',theme:'interieur',floor:'beton',key:{d:[.32,1,.22],c:0xffe4c4,i:1.35},hemiI:.62,envI:.5,exp:1.05},
+  plaine3d:{nom:"Terrain d'essai 3D",desc:'Grande plaine herbeuse, caisses, murets et collines à l’horizon.',theme:'ciel',floor:'herbe',exp:.72,fogK:.45,sky:[1.4,1.9,.003,.78,34,200]},
 };
 function g3Init(){
   if(G3.ready) return true; if(!r3Usable()&&!(R3.ok&&!R3.failed)) return false;
@@ -9930,16 +9930,16 @@ function g3NoLock(){ if(G3.noLock) return; G3.noLock=true; g3Hint(); toast('Sour
 function g3Hint(){ if(!G3.ui) return; G3.ui.querySelector('#g3play').hidden=!G3.on||G3.touch||G3.locked||G3.noLock||!$('#cat').hidden||TITLE.on; }
 function g3HudMap(){ G3.ui.querySelectorAll('[data-g3map]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.g3map===G3.map)); $('#mapname').textContent=G3MAPS[G3.map].nom; }
 /* ---------- Entrée / sortie ---------- */
-function g3Enter(map){
+function g3Enter(map,opt){ const bg=opt&&opt.bg;
   if(!R3.ok&&!R3.failed) r3Init();
   if(!R3.ok||!THREE){toast('Le mode 3D demande WebGL 2, indisponible sur cet appareil.'); return false;}
   if(!g3Init()) return false;
-  if(TITLE.on) showTitle(false); closeCat();
-  G3.on=true; document.body.classList.add('g3'); G3.ui.hidden=false; R3S.canvas.style.display='block'; G3.w=0; G3.lvl=-1; G3.fire=false; G3.aim=false;
+  if(TITLE.on&&!bg) showTitle(false); if(!bg) closeCat();
+  G3.on=true; document.body.classList.add('g3'); G3.ui.hidden=!!TITLE.on; R3S.canvas.style.display='block'; G3.w=0; G3.lvl=-1; G3.fire=false; G3.aim=false;
   if(S.paused) setPause(false);
   if(map||G3.built!==G3.map) {g3Build(map||G3.map); G3.built=G3.map;}
   if(S.hand.cat==='cartes'||S.hand.cat==='reglages') takeHand('armes',S.weapon);
-  g3HudMap(); g3Hint(); g3Hud();
+  g3HudMap(); g3Hint(); g3Hud(); if(TITLE.on){ if(typeof renderTitle==='function') renderTitle(); return true; }
   toast(G3.touch?'Joystick à gauche pour avancer, glissez à droite pour regarder, FEU pour tirer.':'Mode 3D : cliquez dans la scène pour prendre la souris. ZQSD ou WASD pour avancer, clic pour tirer.');
   return true;
 }
@@ -9949,6 +9949,7 @@ function g3Exit(){
   if(R3S.canvas) R3S.canvas.style.display=r3Usable()?'block':'none'; R3S.w=0; R3S.lvl=-1; R3S.rd.toneMappingExposure=1;
   $('#mapname').textContent=MAP.nom; cv.style.cursor='crosshair';
 }
+function g3TitlePlay(){ if(G3.on) showTitle(false); else g3Enter(); }
 /* ---------- Clavier ---------- */
 const G3MOV={KeyW:1,KeyA:1,KeyS:1,KeyD:1,ArrowUp:1,ArrowDown:1,ArrowLeft:1,ArrowRight:1,ShiftLeft:1,ShiftRight:1,KeyC:1,ControlLeft:1,Space:1};
 function g3Key(e,down){
@@ -10037,7 +10038,7 @@ function g3Player(el){
 function g3Frame(el){
   G3.frame=(G3.frame||0)+1; g3QualTick(el);
   const scale=S.slow?timeScale:1, dt=S.paused?0:el*scale;
-  g3Player(el); g3CamPose(el);
+  const att=TITLE.on; if(att){const P=G3.pl; G3.attT=(G3.attT||0)+el; P.yaw=Math.sin(G3.attT*.09)*.45; P.pitch=-.04+Math.sin(G3.attT*.06)*.03; G3.fire=false; G3.tap=false;} else g3Player(el); g3CamPose(el);
   if(dt>0){G3.acc=(G3.acc||0)+dt; let n=0; while(G3.acc>=DT&&n<4){g3Step(DT); G3.t+=DT; G3.acc-=DT; n++;} if(n===4) G3.acc=0; g3FxTick(dt);}
   // armes
   G3.cool-=el; G3.gcool=(G3.gcool||0)-el; const h=S.hand, catOpen=!$('#cat').hidden;
@@ -10069,7 +10070,7 @@ function g3Size(){
   rd.setPixelRatio(pr); rd.setSize(w,h,false); G3.comp.setPixelRatio(pr); G3.comp.setSize(w,h); G3.cam.aspect=w/h; G3.cam.updateProjectionMatrix();
 }
 function g3CamPose(el){
-  const P=G3.pl, cam=G3.cam;
+  const P=G3.pl, cam=G3.cam; if(!(P.eye>0)) P.eye=98;
   // caméra à la 1re personne
   const w=curW(), scope=S.hand.cat==='armes'&&(w.look==='sniper'||w.look==='amr'), adsT=G3.aim?1:0; G3.ads=(G3.ads||0)+(adsT-(G3.ads||0))*Math.min(1,el*12);
   const fov=74+((scope?18:54)-74)*G3.ads; if(Math.abs(cam.fov-fov)>.01){cam.fov=fov; cam.updateProjectionMatrix();}
@@ -10078,7 +10079,7 @@ function g3CamPose(el){
   cam.position.set(P.x,P.y+P.eye+Math.abs(Math.sin(bob))*2.2*bobK,P.z); cam.updateMatrixWorld();
   // arme en main
   g3GunModel(); const g=G3.gun, ads=G3.ads, sw=G3.swing||0;
-  g.scale.setScalar(.5); g.visible=!(scope&&ads>.85);
+  g.scale.setScalar(.5); g.visible=!(scope&&ads>.85)&&!TITLE.on;
   const ay=G3.adsY||-1.7, hip=G3.hip||[3.6,-4.4,-7.5]; g.position.set(hip[0]*(1-ads)+Math.sin(bob)*.35*bobK-sw*2,hip[1]+(ay-hip[1])*ads-Math.abs(Math.cos(bob))*.3*bobK+sw*1.5,hip[2]+ads*1.6+G3.recoil*.9);
   g.rotation.set(G3.recoil*.06+sw*.5,(1-ads)*.05+sw*.9,Math.sin(sw*Math.PI)*-.9);
 }
@@ -10319,7 +10320,7 @@ addEventListener('keydown',e=>{
     if(k==='escape'){e.preventDefault(); closeCat();}
     else if(k==='enter'&&CS.sel){e.preventDefault(); doAct(CS.sel.cat==='cartes'?'load':CS.sel.cat==='equip'?'equipTool':'take');}
     return;}
-  if(TITLE.on){ if(k==='enter'||k==='escape'){e.preventDefault(); showTitle(false);} return; }
+  if(TITLE.on){ if(k==='enter'){e.preventDefault(); g3TitlePlay();} else if(k==='escape'){e.preventDefault(); showTitle(false);} return; }
   if(G3.on&&!open&&g3Key(e,true)) return;
   if(!open&&k==='escape'){e.preventDefault(); showTitle(true); return;}
   if(open){ if(k==='escape'||k==='m'){e.preventDefault();closeCat();} else if(k==='enter'&&CS.sel&&!e.target.closest('button')){e.preventDefault(); doAct(CS.sel.cat==='cartes'?'load':CS.sel.cat==='equip'?'equipTool':'take');} return; }
@@ -10382,15 +10383,20 @@ function titleCam(dt){
 $('#title').addEventListener('click',e=>{
   const mb=e.target.closest('[data-map]'); if(mb){loadMap(mb.dataset.map); renderTitle(); return;}
   const b=e.target.closest('[data-t]'); if(!b) return; const t=b.dataset.t;
-  if(t==='play') showTitle(false);
-  else if(t==='g3') g3Enter();
+  if(t==='play') g3TitlePlay();
+  else if(t==='profil'){ g3Exit(); showTitle(false); }
   else if(t==='quit') window.close();
   else {showTitle(false); openCat(t);}
 });
 $('#b-menu').onclick=()=>showTitle(true);
 /* ---------- Mode 3D : raccordements ---------- */
-{ const _st=showTitle; showTitle=function(on){ if(on&&G3.on) g3Exit(); const r=_st(on); if(G3.ui) g3Hint(); return r; };
-  const _lm=loadMap; loadMap=function(id){ if(G3.on) g3Exit(); return _lm(id); };
+{ const _st=showTitle; showTitle=function(on){ if(on&&G3.on){ g3Unlock(); G3.fire=false; G3.aim=false; G3.keys={}; G3.mv.x=G3.mv.y=0; if(G3.ui) G3.ui.hidden=true; }
+    const r=_st(on); if(!on&&G3.on&&G3.ui){ G3.ui.hidden=false; g3HudMap(); } if(G3.ui) g3Hint(); return r; };
+  const _rt=renderTitle; renderTitle=function(){ _rt(); const c=$('#t-mapc');
+    if(G3.on){ c.style.display='none'; const M=G3MAPS[G3.map]; $('#t-mapname').textContent=M.nom; $('#t-mapdesc').textContent=M.desc||''; $('#t-maps').innerHTML=Object.entries(G3MAPS).map(([id,m])=>`<button data-g3map="${id}" aria-pressed="${id===G3.map}">${esc(m.nom)}</button>`).join(''); }
+    else c.style.display=''; $('#t-r3').textContent=R3.failed?'Rendu 2D (WebGL indisponible)':'Moteur 3D temps réel · WebGL 2 · Three.js'; };
+  $('#title').addEventListener('click',e=>{ const b=e.target.closest('[data-g3map]'); if(b){ g3Build(b.dataset.g3map); G3.built=G3.map; renderTitle(); } });
+  const _lm=loadMap; loadMap=function(id){ if(G3.on){ g3Exit(); setTimeout(()=>toast('Vue de profil : '+(MAPS[id]||MAPS.stand).nom+'. Le jeu en 3D est dans le menu (Échap).'),50); } return _lm(id); };
   const _th=takeHand; takeHand=function(cat,id){ const r=_th(cat,id); if(G3.on){ g3Hud(); if(cat==='perso') toast('Cliquez (ou E) pour placer ce personnage là où vous visez.'); else if(cat==='gadgets'||(cat==='outils'&&id!=='main'&&id!=='gomme')) toast('Les gadgets et pièges arrivent bientôt en mode 3D.'); } return r; };
   const _oc=openCat; openCat=function(c){ if(G3.on) g3Unlock(); const r=_oc(c); if(G3.ui) g3Hint(); return r; };
   const _cc=closeCat; closeCat=function(){ const r=_cc(); if(G3.ui) g3Hint(); return r; };
@@ -10421,7 +10427,7 @@ function start(data){
   makeTextures(); makeTex7(); if(R3.on) r3Init(); resize(); loadMap(S.map);
   const hc=S.hand; S.recent=S.recent.filter(r=>!(r.cat===hc.cat&&r.id===hc.id)); takeHand(hc.cat,hc.id);
   setTimeout(()=>{ if(!$('#toast').classList.contains('off')) hideToast(); },9000);
-  if(!/[?&]debug/.test(location.search)||/[?&]title/.test(location.search)) showTitle(true);
+  if(!/[?&]debug/.test(location.search)||/[?&]title/.test(location.search)){ showTitle(true); if(!/[?&]nog3/.test(location.search)) g3Enter(undefined,{bg:true}); }
   let last=performance.now(), acc=0, uiT=0;
   const frame=now=>{
     const el=Math.min(.05,(now-last)/1000); last=now; sfxCount=0;

@@ -5858,7 +5858,9 @@ function shieldSeg(r){ // bouclier tenu dans la main avant, aligné sur le torse
 function addFx(o){ if(fx.length>1500) fx.splice(0,fx.length-1500); fx.push(o); }
 function gore(r,x,y,dx,dy,n,spd){
   if(r.bcol&&bloodK()){const B=BLOODS[r.bcol]; n=Math.round(n*bloodK());
-    for(let i=0;i<n;i++) addFx({t:'blood',x,y,vx:dx*spd*rnd(.15,1)+rnd(-70,70),vy:dy*spd*rnd(.15,1)+rnd(-110,30),life:rnd(.8,1.8),s:rnd(1.2,2.8),c:B.p,st:B.s});}
+    for(let i=0;i<n;i++) addFx({t:'blood',x,y,vx:dx*spd*rnd(.15,1)+rnd(-70,70),vy:dy*spd*rnd(.15,1)+rnd(-110,30),life:rnd(.8,1.8),s:rnd(1.2,2.8),c:B.p,st:B.s});
+    for(let i=0;i<Math.ceil(n*.7);i++) addFx({t:'bmist',x,y,vx:dx*spd*rnd(.05,.5)+rnd(-80,80),vy:dy*spd*rnd(.05,.5)+rnd(-90,30),life:rnd(.3,.7),max:.7,s:rnd(2.5,6),c:B.p});
+    for(let i=0;i<Math.ceil(n/5);i++) addFx({t:'blood',x,y,vx:dx*spd*rnd(.1,.5)+rnd(-40,40),vy:dy*spd*rnd(.1,.5)+rnd(-60,10),life:rnd(1,2),s:rnd(2.8,4.2),c:B.p,st:B.s});}
   if(r.look==='squelette') debris(x,y,Math.ceil(n/5),'#e6dfcb',140);
   else if(r.look==='crash') debris(x,y,Math.ceil(n/6),'#e3bf1f',120);
   else if(r.look==='robot') sparks(x,y,-dx,-dy,Math.ceil(n/3),'#9fd8ff');
@@ -5893,7 +5895,7 @@ function text(x,y,txt,kind){
 }
 function stamp(x,y,s,a,rgb,side,vx){
   if(!bloodK()||!rgb) return;
-  r3Decal('blood',x,y,s,side,rgb);
+  r3Decal('blood',x,y,s,side,rgb,vx);
   sctx.fillStyle=`rgba(${rgb},${a*.55})`;
   if(side){sctx.beginPath(); sctx.ellipse(x,y,s*rnd(.8,1.4),s*rnd(.8,1.3),0,0,7); sctx.fill();
     if(Math.random()<.55){const L=rnd(4,16)*s*.6, w=Math.max(.6,s*.45); sctx.fillStyle=`rgba(${rgb},${a*.5})`; sctx.fillRect(x-w/2,y,w,L); sctx.beginPath(); sctx.arc(x,y+L,w*.75,0,7); sctx.fill();}
@@ -5931,10 +5933,22 @@ function checkDeath(r){
   else if(!C.noBleed&&r.blood<=18) c='Hémorragie'; else if(r.char>=.95) c='Carbonisé';
   if(c){r.alive=false;r.cause=c; r.jetOn=false; onDeath(r); feed(`${r.name} · ${c}${r.src&&r.src!==c?' · '+r.src:''}`);}
 }
+/* Hématomes : se forment sur les chocs, évoluent du rouge au violet, au bleu puis au jaune */
+function bruiseRGB(t){const K=[[0,[150,42,54]],[2,[122,38,80]],[12,[80,40,106]],[35,[62,58,112]],[70,[132,126,64]]];
+  for(let i=1;i<K.length;i++) if(t<K[i][0]){const [t0,a]=K[i-1],[t1,b]=K[i], u=(t-t0)/(t1-t0); return a.map((v,j)=>Math.round(v+(b[j]-v)*u));} return K[K.length-1][1];}
+function bruise(r,part,wnd,d){
+  r.bruises=r.bruises||[]; let bi=wnd&&wnd.bi!==undefined?wnd.bi:-1, bt=wnd&&wnd.bt!==undefined?clamp(wnd.bt,.08,.92):rnd(.25,.75);
+  if(bi<0||!r.bones[bi]||r.bones[bi].part!==part){const c=[]; r.bones.forEach((b,i)=>{if(b.part===part) c.push(i);}); if(!c.length) return; bi=pick(c);}
+  const k=clamp(d/22,.3,1.5);
+  for(const b of r.bruises) if(b.bi===bi&&Math.abs(b.bt-bt)<.22){b.s=Math.min(1.9,b.s+k*.5); b.age=Math.min(b.age,1.5); return;}
+  r.bruises.push({bi,bt,s:k,age:0,sd:Math.random()}); if(r.bruises.length>14) r.bruises.shift();
+}
+function ptWnd(r,j,k){const i=r.bones.findIndex(b=>b.b===j); if(i>=0) return {bi:i,bt:.88,k}; const i2=r.bones.findIndex(b=>b.a===j); return i2>=0?{bi:i2,bt:.12,k}:null;}
 function hurt(r,part,d,pen,wnd,src){
   if(d<=0) return; const C=r.C;
   d*=C.flesh||1; r.parts[part].hp-=d; r.flash[part]=.09; if(src&&r.alive) r.src=src;
-  if(pen&&!C.noBleed){ r.bleed+=d*.035; if(wnd){r.wounds.push({bi:wnd.bi,bt:wnd.bt,drip:10}); if(r.wounds.length>30) r.wounds.shift();} }
+  if(pen&&!C.noBleed){ r.bleed+=d*.035; if(wnd){r.wounds.push({bi:wnd.bi,bt:wnd.bt,drip:10,k:wnd.k||'balle',a:wnd.a||0,sz:clamp(d/18,.6,2.2),age:0,sd:Math.random()}); if(r.wounds.length>30) r.wounds.shift();} }
+  if((!pen||(wnd&&wnd.k==='masse'))&&d>2.5&&!C.noBleed&&!C.metal&&r.look!=='squelette'&&r.look!=='crash') bruise(r,part,wnd,d);
   r.stun=Math.max(r.stun,(d-14)/30*(C.noPain?.3:1));
   if(C.brittle&&PARTS_DEF[part].cut>=0&&r.parts[part].hp<=0&&!r.cut[part]) sever(r,part);
   checkDeath(r);
@@ -5976,7 +5990,7 @@ function damageRag(r,part,bi,bt,E,baseE,dmg,x,y,dx,dy,kind,src){
     let d=dmg*D.mul;
     if(arm){const M=MATS[arm.mat]; arm.integ-=E/Math.max(M.stop,200)*M.integ*.12*M.brit+3; d*=.45+.4*M.blunt; if(arm.integ<=0) breakArmor(r,part,x,y); sparks(x,y,-dx,-dy,5); sfx('bong');}
     else sfx('chair');
-    hurt(r,part,d,d>30,{bi,bt},src); shove(r,bi,bt,dx,dy,E*.45+200); r.stun=Math.max(r.stun,d/25);
+    hurt(r,part,d,d>30,{bi,bt,k:'masse',a:Math.atan2(dy,dx)},src); shove(r,bi,bt,dx,dy,E*.45+200); r.stun=Math.max(r.stun,d/25);
     text(x,y,'CHOC −'+Math.round(d),'mid'); logHit({src,part:D.label,mat:matName,res:'Choc',cls:'mid',E});
     return 0;
   }
@@ -5985,7 +5999,7 @@ function damageRag(r,part,bi,bt,E,baseE,dmg,x,y,dx,dy,kind,src){
     const res=armorHit(arm,E,kind), M=MATS[arm.mat];
     if(arm.integ<=0) breakArmor(r,part,x,y);
     if(res.blocked){
-      hurt(r,part,dmg*M.blunt*Math.min(1,E/Math.max(baseE,1))*D.mul,false,null,src);
+      hurt(r,part,dmg*M.blunt*Math.min(1,E/Math.max(baseE,1))*D.mul,false,{bi,bt,k:'contusion'},src);
       shove(r,bi,bt,dx,dy,E*.07); sparks(x,y,-dx,-dy,kind==='lame'?6:12);
       sfx('clang'); text(x,y,kind==='lame'?'PARÉ':'ARRÊTÉ','steel');
       if(kind!=='lame') S.stats.arretes++;
@@ -5995,7 +6009,7 @@ function damageRag(r,part,bi,bt,E,baseE,dmg,x,y,dx,dy,kind,src){
   }
   const absorb=Math.min(E,D.abs*r.sc);
   const dealt=dmg*D.mul*Math.min(1,absorb/Math.min(Math.max(baseE,1),D.abs));
-  hurt(r,part,dealt,true,{bi,bt},src); E-=absorb; lastPen=true; S.stats.dmg=(S.stats.dmg||0)+dealt*(r.C.flesh||1); if(part==='tete') S.stats.tete=(S.stats.tete||0)+1;
+  hurt(r,part,dealt,true,{bi,bt,k:kind,a:Math.atan2(dy,dx)},src); E-=absorb; lastPen=true; S.stats.dmg=(S.stats.dmg||0)+dealt*(r.C.flesh||1); if(part==='tete') S.stats.tete=(S.stats.tete||0)+1;
   gore(r,x,y,dx,dy,Math.min(22,4+dealt/3),kind==='lame'?160:240);
   if(E>50) gore(r,x+dx*8,y+dy*8,dx,dy,8,420);
   shove(r,bi,bt,dx,dy,absorb*.12+E*.02+(kind==='lame'?120:0));
@@ -6170,7 +6184,7 @@ function explode(x,y,ex,src){
       if(r.frozen&&f>.25&&PARTS_DEF[part].cut>=0&&!r.cut[part]){sever(r,part);continue;}
       if(Pp.armor){const M=MATS[Pp.armor.mat]; d*=1-M.stop/(M.stop+4000)*.85; Pp.armor.integ-=ex.dmg*f*1.5*M.brit;
         if(Pp.armor.integ<=0){const q=bonePos(r,bb,.5); breakArmor(r,part,q.x,q.y);} }
-      hurt(r,part,d*PARTS_DEF[part].mul*.8,d>8,{bi:bb,bt:.5},ex.nom);
+      hurt(r,part,d*PARTS_DEF[part].mul*.8,d>8,{bi:bb,bt:rnd(.2,.8),k:'eclat',a:rnd(0,6.28)},ex.nom);
       if(f>.5&&Pp.hp<=0&&!r.cut[part]&&Math.random()<.75) sever(r,part);
       if(f>.55) r.char=Math.min(1,r.char+.15*f);
     }
@@ -6264,7 +6278,7 @@ function applySoin(r,id){
       r.blood=Math.max(r.blood,45); r.bleed*=.2; r.stun=1.5; r.air=10; for(const p of r.pts) kick(p,rnd(-60,60),rnd(-160,-40)); t='RÉANIMÉ'; feed(`${r.name} · réanimé`); break;
     case 'extincteur': r.burn=0; r.frozen=0; r.ice=null; r.cold=0; for(let i=0;i<16;i++) addFx({t:'smoke',x:x+rnd(-10,10),y:r.pts[1].y,vx:rnd(-80,80),vy:rnd(-80,10),life:rnd(.6,1.2),max:1.2,s:rnd(6,12),c:'white'}); t='ÉTEINT'; break;
     case 'reparer': for(const kk of PART_ORDER){const a=r.parts[kk].armor; if(a) a.integ=a.max;} if(r.shield) r.shield.integ=r.shield.max; t='RÉPARÉ'; k='steel'; break;
-    case 'complet': for(const kk of PART_ORDER) r.parts[kk].hp=r.parts[kk].max; Object.assign(r,{blood:100,bleed:0,wounds:[],stun:0,burn:0,char:0,frozen:0,ice:null,shock:0,cold:0,air:10});
+    case 'complet': for(const kk of PART_ORDER) r.parts[kk].hp=r.parts[kk].max; Object.assign(r,{blood:100,bleed:0,wounds:[],bruises:[],stun:0,burn:0,char:0,frozen:0,ice:null,shock:0,cold:0,air:10});
       if(!r.cut.tete){r.alive=true;r.cause='';} t=r.alive?'SOIGNÉ':'IRRÉCUPÉRABLE'; k=r.alive?'ok':'bad'; break;
   }
   text(x,y,t,k); if(id!=='defib') sfx('clic');
@@ -7003,6 +7017,7 @@ function updateRags(dt){
     const r=bodies[i], C=r.C;
     if(r.pts[2].y>WH+400&&r.pts[0].y>WH+400){ if(r.alive){r.alive=false; r.cause='Chute dans le vide'; feed(`${r.name} · tombé dans le vide`);} bodies.splice(i,1); for(let j=ropes.length-1;j>=0;j--) if(r.pts.includes(ropes[j].a)||r.pts.includes(ropes[j].b)) ropes.splice(j,1); if(selected===r) selected=null; if(hovered===r) hovered=null; continue; }
     if(r.sleep>0){r.sleep-=dt; if(r.alive&&Math.random()<dt*1.2) text(r.pts[0].x+8,r.pts[0].y-14,'z','steel');}
+    if(r.bruises) for(const b of r.bruises) b.age+=dt;
     if(r.stun>0) r.stun-=dt; if(r.adren>0) r.adren-=dt; if(r.shock>0) r.shock-=dt; if(r.shflash>0) r.shflash-=dt;
     for(const k in r.flash) r.flash[k]-=dt;
     if(r.frozen>0){r.frozen-=dt; if(r.frozen<=0){r.frozen=0; r.ice=null; text(r.pts[1].x,r.pts[1].y-20,'DÉGELÉ','steel');}}
@@ -7010,8 +7025,10 @@ function updateRags(dt){
     if(C.regen&&r.alive){heal(r,C.regen*dt); r.blood=Math.min(100,r.blood+dt); r.bleed*=1-dt*.5;}
     if(r.bcol&&bloodK()){const B=BLOODS[r.bcol]; poolTick(r,B,dt);
       for(const w of r.wounds){ w.age=(w.age||0)+dt; if(w.drip<=0) continue; w.drip-=dt;
-        if(Math.random()<Math.min(.5,r.bleed*dt*.8*bloodK())){const q=bonePos(r,w.bi,w.bt);addFx({t:'blood',x:q.x,y:q.y,vx:rnd(-10,10),vy:rnd(0,30),life:2,s:rnd(1.2,2),c:B.p,st:B.s});} }
-      for(const k in r.cut) if(Math.random()<dt*4*bloodK()){const b=r.bones[PARTS_DEF[k].cut], q=r.pts[k==='tete'?b.b:b.a]; addFx({t:'blood',x:q.x,y:q.y,vx:rnd(-30,30),vy:rnd(-20,40),life:2,s:2,c:B.p,st:B.s});}
+        if(Math.random()<Math.min(.7,(r.bleed*1.1+(w.drip>7?2.2:.9))*dt*bloodK())){const q=bonePos(r,w.bi,w.bt);addFx({t:'blood',x:q.x+rnd(-1,1),y:q.y,vx:rnd(-6,6),vy:rnd(10,40),life:2,s:rnd(1,1.8),c:B.p,st:B.s});} }
+      for(const k in r.cut){const b=r.bones[PARTS_DEF[k].cut]; if(!b) continue; const q=r.pts[k==='tete'?b.b:b.a], c=r.pts[k.startsWith('jambe')?1:2], dx0=q.x-c.x, dy0=q.y-c.y, L=Math.hypot(dx0,dy0)||1, pw=clamp(r.blood/100,0,1)*(r.alive?1:.45);
+        if(Math.sin(S.time*7.5+r.id)>.2&&Math.random()<dt*22*pw*bloodK()){const v=rnd(90,260)*pw; addFx({t:'blood',x:q.x,y:q.y,vx:dx0/L*v+rnd(-25,25),vy:dy0/L*v+rnd(-25,15),life:2,s:rnd(1.4,2.6),c:B.p,st:B.s});}
+        else if(Math.random()<dt*5*bloodK()) addFx({t:'blood',x:q.x,y:q.y,vx:rnd(-12,12),vy:rnd(0,30),life:2,s:rnd(1.2,2),c:B.p,st:B.s});}
     }
     if(r.burn>0){
       r.burn-=dt; r.char=Math.min(1,r.char+dt*.045);
@@ -7036,7 +7053,7 @@ function updateRags(dt){
     let fall=0, fp=null;
     for(let j=0;j<r.pts.length;j++){const p=r.pts[j]; if(p.imp>fall&&POINT_PART[j]){fall=p.imp;fp=j;} p.imp=0;}
     if(fall>600&&r.fallT<=S.time){const part=POINT_PART[fp], d=(fall-600)*.09*(r.exo?.4:1);
-      if(d>3){hurt(r,part,d,d>25,null,'Chute'); r.fallT=S.time+.35; const p=r.pts[fp]; text(p.x,p.y-12,'CHUTE −'+Math.round(d*(C.flesh||1)),'bad'); sfx(C.metal?'bong':'chair',Math.min(1,d/30));
+      if(d>3){hurt(r,part,d,d>25,ptWnd(r,fp,'chute'),'Chute'); r.fallT=S.time+.35; const p=r.pts[fp]; text(p.x,p.y-12,'CHUTE −'+Math.round(d*(C.flesh||1)),'bad'); sfx(C.metal?'bong':'chair',Math.min(1,d/30));
         if(d>18) gore(r,p.x,p.y,0,-1,Math.min(16,d/2),180); if(r.frozen&&fall>800) for(const k of PART_ORDER) if(PARTS_DEF[k].cut>=0&&Math.random()<.5) sever(r,k);
         if(C.brittle&&fall>1000){const k=pick(['brasG','brasD','jambeG','jambeD','tete']); sever(r,k);}}}
     checkDeath(r);
@@ -7105,7 +7122,7 @@ function updateGadgets(dt){
     else if(g.type==='pics'){
       for(const r of bodies) for(let j=0;j<11;j++){const p=r.pts[j]; if(Math.abs(p.x-g.x)>g.w/2||p.y+p.r<g.y-24||p.y>g.y+4) continue;
         const vy=(p.y-p.oy)/SDT, key='p'+j; if(vy<120||(r.cool[key]||0)>S.time) continue; r.cool[key]=S.time+.5;
-        const part=POINT_PART[j], d=10+vy*.05; hurt(r,part,d,true,null,'Pics'); gore(r,p.x,p.y,0,-1,10,160); p.oy=p.y; p.ox=p.x; text(p.x,p.y-12,'EMPALÉ','bad'); sfx('chair');
+        const part=POINT_PART[j], d=10+vy*.05; hurt(r,part,d,true,ptWnd(r,j,'pic'),'Pics'); gore(r,p.x,p.y,0,-1,10,160); p.oy=p.y; p.ox=p.x; text(p.x,p.y-12,'EMPALÉ','bad'); sfx('chair');
         (g.blood=g.blood||[]).push(p.x); if(g.blood.length>20) g.blood.shift(); selected=r;}}
     else if(g.type==='tourelle'){
       g.cool-=dt; let best=null, bd=1100;
@@ -7141,6 +7158,7 @@ function updateFx(dt){
   for(const f of fx){
     f.life-=dt;
     if(f.t==='smoke'){if(f.drag){f.vx*=1-2.4*dt;f.vy*=1-1.2*dt;} f.x+=f.vx*dt;f.y+=f.vy*dt;f.s+=dt*(f.grow||12);continue;}
+    if(f.t==='bmist'){f.vx*=1-3.2*dt; f.vy=f.vy*(1-3.2*dt)+150*dt; f.x+=f.vx*dt; f.y+=f.vy*dt; f.s+=dt*8; continue;}
     if(f.t==='fire'){f.vy-=180*dt;f.vx*=1-1.5*dt;f.x+=f.vx*dt;f.y+=f.vy*dt; if(f.life<=0&&fx.length<1100&&Math.random()<.16) addFx({t:'smoke',x:f.x,y:f.y,vx:f.vx*.2,vy:rnd(-50,-25),life:rnd(.9,1.8),max:1.8,s:f.s*.7+3,c:'dark',grow:16}); continue;}
     if(f.t==='flamme'||f.t==='cryo'||f.t==='acide'){
       f.vx*=1-1.8*dt; f.vy=f.vy*(1-1.8*dt)-(f.t==='flamme'?140:f.t==='acide'?-420:-60)*dt; f.x+=f.vx*dt; f.y+=f.vy*dt;
@@ -8136,6 +8154,7 @@ function drawFxBase(){
   for(const f of fx){
     if(f.t==='blood'){ctx.strokeStyle=f.c; ctx.lineWidth=f.s*.8; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(f.x,f.y); ctx.lineTo(f.x-f.vx*.014,f.y-f.vy*.014); ctx.stroke();
       ctx.fillStyle=f.c; ctx.beginPath(); ctx.arc(f.x,f.y,f.s*.58,0,7); ctx.fill();}
+    else if(f.t==='bmist'){ctx.globalAlpha=clamp(f.life/f.max,0,1)*.28; ctx.fillStyle=f.c; ctx.beginPath(); ctx.arc(f.x,f.y,f.s,0,7); ctx.fill(); ctx.globalAlpha=1;}
     else if(f.t==='acide'){ctx.fillStyle=`rgba(170,240,70,${clamp(f.life/f.max,0,1)*.85})`; ctx.beginPath(); ctx.arc(f.x,f.y,f.s*.7,0,7); ctx.fill();}
     else if(f.t==='drop'){ctx.fillStyle=f.c; ctx.globalAlpha=clamp(f.life*2,0,1); ctx.beginPath(); ctx.arc(f.x,f.y,f.s,0,7); ctx.fill(); ctx.globalAlpha=1;}
     else if(f.t==='smoke'){const a=clamp(f.life/f.max,0,1)*clamp((f.max-f.life)*7,0,1), al=a*(f.c==='dark'?.62:f.c?.5:.38);
@@ -8240,19 +8259,23 @@ function poolTick(r,B,dt){
   const t=r.pts[1].y>r.pts[2].y?r.pts[1]:r.pts[2]; if(liquidAt(t.x,t.y)) return;
   const gy=groundBelow(t.x,t.y-2); if(gy>WH||gy-t.y>16*r.sc) return;
   if(!r.pool||Math.abs(r.pool.x-t.x)>26||Math.abs(r.pool.y-gy)>4) r.pool={x:t.x,y:gy,R:2,d:0};
-  const P=r.pool, cap=(10+Math.min(30,(100-r.blood)*.45))*r.sc;
+  const P=r.pool, cap=(12+Math.min(46,(100-r.blood)*.62))*r.sc;
   if(P.R<cap) P.R+=dt*(2.4+r.bleed*4+(cut?3:0))*bloodK();
   if(P.R-P.d>=1){P.d=P.R; sctx.fillStyle=`rgba(${B.s},.2)`; sctx.beginPath(); sctx.ellipse(P.x,P.y+1,P.R,Math.max(1.2,P.R*.09),0,0,7); sctx.fill();
     if(P.R>12&&Math.random()<.25){const dx=P.x+rnd(-P.R*.85,P.R*.85), L=rnd(3,12); sctx.fillStyle=`rgba(${B.s},.35)`; sctx.fillRect(dx-.5,P.y+1,1,L);}}
 }
 function drawWounds(r){
+  if(r.bruises&&!LQ) for(const b of r.bruises){const q=bonePos(r,b.bi,b.bt), R=(3+b.s*4.5)*r.sc, c=bruiseRGB(b.age).join(','), g=ctx.createRadialGradient(q.x,q.y,0,q.x,q.y,R);
+    g.addColorStop(0,`rgba(${c},.8)`); g.addColorStop(.6,`rgba(${c},.45)`); g.addColorStop(1,`rgba(${c},0)`); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(q.x,q.y,R,0,7); ctx.fill();}
   if(!r.wounds.length) return; const bl=r.bcol&&bloodK()?BLOODS[r.bcol]:null;
   for(const w of r.wounds){const q=bonePos(r,w.bi,w.bt), age=Math.min(w.age||0,12), R=(1.7+age*.4)*r.sc;
     if(bl&&!LQ){const g=ctx.createRadialGradient(q.x,q.y,0,q.x,q.y,R); g.addColorStop(0,`rgba(${bl.s},.88)`); g.addColorStop(.55,`rgba(${bl.s},.5)`); g.addColorStop(1,`rgba(${bl.s},0)`);
       ctx.fillStyle=g; ctx.beginPath(); ctx.arc(q.x,q.y,R,0,7); ctx.fill();
-      if(age>1.5&&w.drip>0){const L=Math.min(6,age*.7)*r.sc; ctx.strokeStyle=`rgba(${bl.s},.6)`; ctx.lineWidth=1.1*r.sc; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(q.x,q.y); ctx.lineTo(q.x+Math.sin(w.bt*9)*1.1,q.y+L); ctx.stroke();}}
-    ctx.fillStyle=bl?bl.w:'#222'; ctx.beginPath(); ctx.arc(q.x,q.y,1.5*r.sc,0,7); ctx.fill();
-    ctx.fillStyle='rgba(0,0,0,.6)'; ctx.beginPath(); ctx.arc(q.x+.3,q.y+.3,.75*r.sc,0,7); ctx.fill();}
+      if(age>.8){const L=Math.min(9,age*.9)*r.sc; ctx.strokeStyle=`rgba(${bl.s},.7)`; ctx.lineWidth=1.1*r.sc; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(q.x,q.y); ctx.lineTo(q.x+Math.sin(w.bt*9)*1.1,q.y+L); ctx.stroke();}}
+    if(w.k==='lame'||w.k==='eclat'){const L=(w.k==='eclat'?2.5:4.5+(w.sz||1)*2.5)*r.sc, a=w.a||0, c=Math.cos(a), s2=Math.sin(a);
+      ctx.lineCap='round'; ctx.strokeStyle=bl?bl.p:'#5a0a10'; ctx.lineWidth=2.6*r.sc; ctx.beginPath(); ctx.moveTo(q.x-c*L,q.y-s2*L); ctx.lineTo(q.x+c*L,q.y+s2*L); ctx.stroke();
+      ctx.strokeStyle='#1c0204'; ctx.lineWidth=1*r.sc; ctx.stroke();}
+    else{ctx.fillStyle=bl?bl.w:'#222'; ctx.beginPath(); ctx.arc(q.x,q.y,1.5*r.sc,0,7); ctx.fill(); ctx.fillStyle='rgba(0,0,0,.6)'; ctx.beginPath(); ctx.arc(q.x+.3,q.y+.3,.75*r.sc,0,7); ctx.fill();}}
 }
 
 /* ---------- Ciels : nuages volumétriques ---------- */
@@ -8714,10 +8737,10 @@ function THREE_M4(){return THREE?new THREE.Matrix4():null;} function THREE_Q(){r
 const ZAX=THREE?new THREE.Vector3(0,0,1):null;
 function r3EntInit(){
   const geo={s:new THREE.SphereGeometry(1,22,16),c:new THREE.CylinderGeometry(.88,1,1,18,1),b:new T3.RoundedBoxGeometry(1,1,1,2,.18)};
-  const mats={cloth:STD({roughness:.88,metalness:0}),skin:STD({roughness:.52,metalness:0}),metal:STD({roughness:.3,metalness:.92}),glow:new THREE.MeshBasicMaterial({color:0xffffff})};
-  for(const m in mats) for(const g in geo){const n=m+g, im=new THREE.InstancedMesh(geo[g],mats[m],m==='glow'?300:4000); im.castShadow=m!=='glow'; im.receiveShadow=m!=='glow'; im.frustumCulled=false; im.count=0;
+  const mats={wet:new THREE.MeshPhysicalMaterial({roughness:.14,metalness:0,clearcoat:1,clearcoatRoughness:.05}),cloth:STD({roughness:.88,metalness:0}),skin:STD({roughness:.52,metalness:0}),metal:STD({roughness:.3,metalness:.92}),glow:new THREE.MeshBasicMaterial({color:0xffffff})};
+  for(const m in mats) for(const g in geo){const n=m+g, im=new THREE.InstancedMesh(geo[g],mats[m],m==='glow'?600:m==='wet'?3000:4000); im.castShadow=m!=='glow'&&m!=='wet'; im.receiveShadow=m!=='glow'; im.frustumCulled=false; im.count=0;
     im.setColorAt(0,new THREE.Color()); R3S.dyn.add(im); IM[n]=im; IMN[n]=0;}
-  R3S.ents=new Map(); R3S.wpn={};
+  R3S.ents=new Map(); R3S.wpn={}; r3BodyDecalInit();
 }
 function put(cls,shape,x,y,z,sx,sy,sz,ang,col){
   const n=cls+shape, im=IM[n], i=IMN[n]; if(i>=im.instanceMatrix.count) return; IMN[n]=i+1;
@@ -8741,13 +8764,13 @@ function r3Rag(r){
   const arm=r.parts, armor=(k)=>arm[k].armor, AC=(k)=>{const a=armor(k); return a?[MATS[a.mat].metal?'metal':'cloth',shade(r,MATS[a.mat].col)]:null;};
   // jambes (arrière puis avant)
   for(const s of ['G','D']){const k='jambe'+s, z=zs(s)*6.5*sc, hip=at(uL*.92), kn=p[s==='G'?7:9], ft=p[s==='G'?8:10]; if(r.cut[k]&&false) continue;
-    seg3(bodyCls,hip,kn,z,6.2*sc*th,pants); ell(bodyCls,kn.x,kn.y,z,5.4*sc*th,5.4*sc*th,5.4*sc*th,0,pants); seg3(bodyCls,kn,ft,z,5*sc*th,pants,4.6*sc*th);
-    const a=AC(k); if(a){seg3(a[0],kn,ft,z+.5,6.4*sc,a[1]); ell(a[0],kn.x,kn.y,z+1,6.6*sc,6*sc,6.6*sc,0,a[1]); seg3(a[0],hip,kn,z+.5,7.4*sc,a[1]);}
+    if(!r.cut[k]) seg3(bodyCls,hip,kn,z,6.2*sc*th,pants); ell(bodyCls,kn.x,kn.y,z,5.4*sc*th,5.4*sc*th,5.4*sc*th,0,pants); seg3(bodyCls,kn,ft,z,5*sc*th,pants,4.6*sc*th);
+    const a=AC(k); if(a){seg3(a[0],kn,ft,z+.5,6.4*sc,a[1]); ell(a[0],kn.x,kn.y,z+1,6.6*sc,6*sc,6.6*sc,0,a[1]); if(!r.cut[k]) seg3(a[0],hip,kn,z+.5,7.4*sc,a[1]);}
     const dx=ft.x-kn.x, dy=ft.y-kn.y, la=Math.atan2(-dy,dx); put(robot?'metal':'cloth','b',ft.x+f*4*sc,ft.y+2*sc,z,15*sc,7*sc,8.5*sc*th,la+Math.PI/2,skel?skin:boot);
   }
   // bras arrière
   const armS=(s)=>{const k='bras'+s, z=zs(s)*12.5*sc, sh=at(4,0), el=p[s==='G'?3:5], hd=p[s==='G'?4:6];
-    ell(bodyCls,sh.x,sh.y,z,5.4*sc*th,5.4*sc*th,5.4*sc*th,0,shirt); seg3(bodyCls,sh,el,z,4.4*sc*th,shirt,4*sc*th); ell(bodyCls,el.x,el.y,z,4*sc*th,4*sc*th,4*sc*th,0,shirt);
+    ell(bodyCls,sh.x,sh.y,z,5.4*sc*th,5.4*sc*th,5.4*sc*th,0,shirt); if(!r.cut[k]) seg3(bodyCls,sh,el,z,4.4*sc*th,shirt,4*sc*th); ell(bodyCls,el.x,el.y,z,4*sc*th,4*sc*th,4*sc*th,0,shirt);
     seg3(ninja||astro||robot?bodyCls:skinCls,el,hd,z,3.7*sc*th,ninja||astro?shirt:skin,3.2*sc*th); ell(skinCls,hd.x,hd.y,z,3.8*sc,3.4*sc,3*sc,0,astro?'#d8dde4':skin);
     const a=AC(k); if(a){seg3(a[0],el,hd,z+.4,5*sc,a[1],4.4*sc); ell(a[0],sh.x,sh.y,z,7*sc,6.2*sc,7*sc,0,a[1]);}};
   armS(back);
@@ -8763,7 +8786,7 @@ function r3Rag(r){
     if(crash){const m=at(uL*.3,2); put('glow','s',m.x+nx*9*sc,m.y+ny*9*sc,0,2.2*sc,2.2*sc,2.2*sc,0,'#151515');}
     if(r.dos==='bouee'){const w=at(uL*.62); for(let i=0;i<10;i++){const a2=i/10*Math.PI*2; put('cloth','s',w.x+Math.cos(a2)*15*sc,w.y,Math.sin(a2)*15*sc,5.5*sc,5.5*sc,5.5*sc,0,i%2?'#f2f2ee':'#e8562a');}}}
   // cou et tête
-  const hr=9*sc*(alien?1.22:1)*(astro?1.05:1); seg3(skinCls,{x:H.x+(N.x-H.x)*.4,y:H.y+(N.y-H.y)*.4},N,0,3.8*sc*th,skel?skin:skin);
+  const hr=9*sc*(alien?1.22:1)*(astro?1.05:1); if(!r.cut.tete) seg3(skinCls,{x:H.x+(N.x-H.x)*.4,y:H.y+(N.y-H.y)*.4},N,0,3.8*sc*th,skel?skin:skin);
   const ha=Math.atan2(-(N.y-H.y),N.x-H.x)-Math.PI/2;
   if(robot){put('metal','b',H.x,H.y,0,17*sc,17*sc,16*sc,ha,skin); put('glow','b',H.x+f*7.2*sc,H.y-1*sc,0,3*sc,3.2*sc,12*sc,ha,'#7fe3ff');}
   else{ell(skinCls,H.x,H.y,0,hr*.95,hr*(alien?1.12:1.04),hr*.9,ha,skin);
@@ -8780,11 +8803,8 @@ function r3Rag(r){
     const a=AC('tete'); if(a) ell(a[0],H.x-f*.6*sc,H.y-2.6*sc,0,hr*1.12,hr*.86,hr*1.08,ha,a[1]);}
   // bras avant
   armS(back==='G'?'D':'G');
-  // moignons, blessures
-  const bl=r.bcol&&BLOODS[r.bcol]?BLOODS[r.bcol].p:'#5a0a0a';
-  for(const k in r.cut){const b=r.bones[PARTS_DEF[k].cut]; if(!b) continue; for(const q of [p[b.a],p[b.b]]) ell('skin',q.x,q.y,0,3.6*sc,3.6*sc,3.6*sc,0,bl);}
-  if(bloodK()) for(const w of r.wounds){const q=bonePos(r,w.bi,w.bt), b=r.bones[w.bi], s=b.part.slice(-1), z=(b.part==='torse'||b.part==='tete')?12*sc:zs(s)*(b.part.startsWith('bras')?12.5:6.5)*sc+5*sc, a=Math.min(w.age||0,10), R=(1.6+a*.35)*sc;
-    ell('skin',q.x,q.y,z,R,R*1.15,R*.5,0,bl);}
+  // hématomes, moignons, plaies
+  r3Injuries(r,{zs,sc,th,skin,shirt,pants});
   // bouclier
   if(r.shield){const g=shieldSeg(r), M=MATS[r.shield.mat]; put(M.metal?'metal':'cloth','b',g.cx,g.cy,16*sc,6*sc,58*sc,40*sc,Math.atan2(-(g.y2-g.y1),g.x2-g.x1)-Math.PI/2,shade(r,M.col));}
   // ballons, parachute
@@ -8792,6 +8812,45 @@ function r3Rag(r){
   if(r.chute){const c=at(-70); ell('cloth',c.x,c.y,0,62*sc,20*sc,44*sc,ang,'#e8742a'); for(const s2 of [-1,1]) seg3('cloth',{x:c.x+s2*50*sc,y:c.y+8*sc},N,s2*20*sc,.5,'#ccc');}
 }
 
+function rgbHex(a){return '#'+a.map(v=>clamp(Math.round(v),0,255).toString(16).padStart(2,'0')).join('');}
+function surf3(r,b,sc,th,zs){const p=b.part; if(p==='tete') return [0,9*sc*(r.look==='alien'?1.12:1)*.93]; if(p==='torse') return [0,12.4*sc*th];
+  return [zs(p.slice(-1))*(p.startsWith('bras')?12.5:6.5)*sc, b.r*.98];}
+/* Décalques souples posés sur le corps : bleus, auréoles de sang, filets qui coulent */
+const BD={};
+function r3BodyDecalInit(){
+  const N=mkNoise(91), blob=genTex(128,128,(u,v,o)=>{const dx=u-.5, dy=v-.5, d=Math.sqrt(dx*dx+dy*dy)*2, n=N(u,v,4,4); o[0]=o[1]=o[2]=255; o[3]=clamp((1-(d+(n-.5)*.45))*1.7,0,1)*clamp((1-d)/.25,0,1)*255;});
+  const streak=genTex(64,256,(u,v,o)=>{const w=.2-.07*v, bulb=v>.84?Math.max(0,1-Math.hypot((u-.5)/.3,(v-.92)/.07)):0, a=Math.max(clamp((w-Math.abs(u-.5))/w*1.6,0,1)*sstep(0,.06,v)*(v<.9?1:0),bulb*1.4); o[0]=o[1]=o[2]=255; o[3]=clamp(a,0,1)*255;});
+  const tb=canvasTex(blob,true,false), ts=canvasTex(streak,true,false), geo=new THREE.PlaneGeometry(1,1), base={transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2};
+  const mk3=(k,mat)=>{const m=new THREE.InstancedMesh(geo,mat,3000); m.count=0; m.frustumCulled=false; m.renderOrder=4; m.setColorAt(0,new THREE.Color()); R3S.dyn.add(m); BD[k]={m,n:0};};
+  mk3('bm',STD(Object.assign({map:tb,roughness:.78},base)));
+  mk3('bw',new THREE.MeshPhysicalMaterial(Object.assign({map:tb,roughness:.12,metalness:0,clearcoat:1,clearcoatRoughness:.04},base)));
+  mk3('bs',new THREE.MeshPhysicalMaterial(Object.assign({map:ts,roughness:.12,metalness:0,clearcoat:1,clearcoatRoughness:.04},base)));
+}
+function bput(k,x,y,z,sx,sy,ang,col){const D=BD[k]; if(!D||D.n>=3000) return; _P.set(x,-y,z); _Q.setFromAxisAngle(ZAX,ang); _S.set(sx,sy,1); _M.compose(_P,_Q,_S); D.m.setMatrixAt(D.n,_M); _C.set(col); D.m.setColorAt(D.n,_C); D.n++;}
+function r3Injuries(r,o){
+  const {zs,sc,th,skin,shirt,pants}=o, p=r.pts, B=r.bcol&&BLOODS[r.bcol]?BLOODS[r.bcol]:{p:'#5a0a0a',w:'#3a0606'}, fresh=B.p, dark=mixHex(B.p,'#120204',.5), lying=r.str<.35||!r.alive;
+  if(r.bruises) for(const b of r.bruises){const bn=r.bones[b.bi]; if(!bn) continue; const q=bonePos(r,b.bi,b.bt), [zc,rad]=surf3(r,bn,sc,th,zs), z0=zc+rad+.6, c=rgbHex(bruiseRGB(b.age)), a=b.sd*6;
+    const fore=bn.part.startsWith('bras')&&bn.a!==1, clothed=bn.part!=='tete'&&!fore&&r.look!=='alien', lim=bn.part==='tete'?7*sc:bn.part==='torse'?10*sc:rad*1.15, R=Math.min(lim,(2.8+b.s*3.2)*sc);
+    if(clothed){const cl=bn.part.startsWith('jambe')?pants:shirt; bput('bm',q.x,q.y,z0,R*2.2,R*1.9,a,mixHex(cl,'#000000',.6)); bput('bm',q.x,q.y,z0+.04,R*1.8,R*1.5,a+.4,skin);}
+    bput('bm',q.x,q.y,z0+.08,R*2.1,R*1.8,a,mixHex(skin,c,.68)); bput('bm',q.x+R*.12,q.y-R*.08,z0+.12,R*1.35,R*1.1,a+1.2,mixHex(c,'#000000',.18)); bput('bm',q.x-R*.15,q.y+R*.1,z0+.15,R*.7,R*.6,a+2,mixHex(c,'#000000',.38));}
+  if(!bloodK()) return;
+  for(const k in r.cut){const b=r.bones[PARTS_DEF[k].cut]; if(!b) continue;
+    for(const [q0,o2] of [[p[b.a],p[b.b]],[p[b.b],p[b.a]]]){const dx=o2.x-q0.x, dy=o2.y-q0.y, L=Math.hypot(dx,dy)||1, ux=dx/L, uy=dy/L, off=(k==='tete'&&q0===p[b.a])?8*sc:0, q={x:q0.x+ux*off,y:q0.y+uy*off}, an=Math.atan2(-dy,dx)-Math.PI/2, R=Math.max(3.4*sc,b.r*1.05);
+      ell('wet',q.x,q.y,0,R,R*.5,R,an,'#7e0c12'); ell('skin',q.x,q.y,0,R*.8,R*.58,R*.8,an,'#4a0507'); ell('skin',q.x+ux*R*.38,q.y+uy*R*.38,0,R*.32,R*.62,R*.32,an,'#ece4cf');
+      bput('bs',q.x,q.y+R*1.4,R+.6,R*.7,R*2.8,0,fresh);}}
+  const n=r.wounds.length; for(let i=Math.max(0,n-20);i<n;i++){const w=r.wounds[i], bn=r.bones[w.bi]; if(!bn) continue; const q=bonePos(r,w.bi,w.bt), [zc,rad]=surf3(r,bn,sc,th,zs), z0=zc+rad+.5, age=w.age||0, sz=w.sz||1;
+    const sR=Math.min(bn.part==='torse'?8.5*sc:bn.part==='tete'?5*sc:rad*1.15,(2.2+Math.min(age,20)*.2)*sc*Math.min(1.4,sz));
+    bput('bm',q.x,q.y+sR*.3,z0,sR*1.9,sR*2.4,(w.sd-.5),dark); bput('bw',q.x,q.y,z0+.05,sR*1.3,sR*1.45,w.sd*6,fresh);
+    const L=Math.min(lying?3.5:14,1+age*1.4)*sc; if(L>1.5*sc) bput('bs',q.x+(w.sd-.5)*1.6*sc,q.y+L*.5,z0+.1,1.5*sc,L,0,fresh);
+    if(w.k==='lame'||w.k==='eclat'||w.k==='masse'){const cuts=w.k==='eclat'?[[w.a,.55],[w.a+1.3,.4]]:[[w.a,1]], A=p[bn.a], Bq=p[bn.b], bang=Math.atan2(Bq.y-A.y,Bq.x-A.x), blen=Math.hypot(Bq.x-A.x,Bq.y-A.y);
+      for(const [aa,kk] of cuts){let ca, Lc;
+        if(bn.part==='torse'){ca=aa||0; Lc=Math.min(8*sc,(4+sz*2.5)*sc)*kk;} else if(bn.part==='tete'){ca=aa||0; Lc=Math.min(4.5*sc,(3+sz*1.6)*sc)*kk;}
+        else{ca=bang+(w.sd-.5)*.7; Lc=Math.min(blen*.36,(3.5+sz*2.4)*sc)*kk;}
+        const ang=-ca, wid=Math.min(rad*.42,1.55*sc), c=Math.cos(ca), s2=Math.sin(ca);
+        ell('wet',q.x,q.y,z0+.25,Lc,wid,.5,ang,'#a81e28'); ell('glow',q.x,q.y,z0+.45,Lc*.84,wid*.36,.35,ang,'#1a0204');
+        if(age>.4&&!lying) for(const t of [-.4,.3]){const l2=Math.min(10,age*1.2)*sc*kk; bput('bs',q.x+c*Lc*t,q.y+s2*Lc*t+l2*.5,z0+.15,1.1*sc,l2,0,fresh);}}}
+    else{const hr=(1.05+sz*.25)*sc; ell('skin',q.x,q.y,z0+.25,hr*1.5,hr*1.5,.4,0,'#4e050c'); ell('glow',q.x,q.y,z0+.45,hr*.7,hr*.7,.35,0,'#0e0002');}}
+}
 /* ---------- Arme sur trépied ---------- */
 function wpnTex(w){
   if(R3S.wpn[w.id]) return R3S.wpn[w.id];
@@ -8860,9 +8919,10 @@ function gadgetMesh(gd){
 function r3EntReset(){ if(!R3S.ents) return; for(const [,o] of R3S.ents) R3S.dyn.remove(o); R3S.ents.clear(); }
 function sync(key,make,upd){let o=R3S.ents.get(key); if(!o){o=make(); if(!o) return; R3S.dyn.add(o); R3S.ents.set(key,o);} o.userData.seen=R3.frame; upd(o);}
 function r3SyncEnts(){
-  for(const n in IMN) IMN[n]=0;
+  for(const n in IMN) IMN[n]=0; for(const k in BD) BD[k].n=0;
   const v=view(); for(const r of bodies){const q=r.pts[2]; if(q.x<v.x-260||q.x>v.x+v.w+260||q.y<v.y-300||q.y>v.y+v.h+300) continue; r3Rag(r);}
   for(const n in IM){const im=IM[n]; im.count=IMN[n]; im.instanceMatrix.needsUpdate=true; if(im.instanceColor) im.instanceColor.needsUpdate=true;}
+  for(const k in BD){const m=BD[k].m; m.count=BD[k].n; m.instanceMatrix.needsUpdate=true; m.instanceColor.needsUpdate=true;}
   r3Gun();
   for(const o of props){ if(o.dead) continue; const p=o.p;
     sync(o,()=>propMesh(o.type),m=>{m.position.set(p.x,-p.y,0); const t=o.type;
@@ -8888,7 +8948,7 @@ function r3SyncEnts(){
 /* ---------- Particules 3D : atlas de sprites + rendu instancié (normal et additif) ---------- */
 const PFX={};
 function r3Atlas(){
-  const c=document.createElement('canvas'); c.width=c.height=1024; const g=c.getContext('2d'), T=256;
+  const c=document.createElement('canvas'); c.width=1024; c.height=1280; const g=c.getContext('2d'), T=256;
   const at=(i,img)=>{if(img) g.drawImage(img,(i%4)*T,Math.floor(i/4)*T,T,T);};
   const mk2=(f)=>{const k=document.createElement('canvas'); k.width=k.height=T; f(k.getContext('2d')); return k;};
   at(0,mk2(q=>{const r=q.createRadialGradient(128,128,0,128,128,128); r.addColorStop(0,'rgba(255,255,255,1)'); r.addColorStop(.25,'rgba(255,255,255,.55)'); r.addColorStop(.6,'rgba(255,255,255,.12)'); r.addColorStop(1,'rgba(255,255,255,0)'); q.fillStyle=r; q.fillRect(0,0,T,T);}));
@@ -8901,6 +8961,12 @@ function r3Atlas(){
   at(13,mk2(q=>{const r=q.createRadialGradient(128,128,0,128,128,128); r.addColorStop(0,'rgba(255,255,255,1)'); r.addColorStop(.35,'rgba(255,255,255,.9)'); r.addColorStop(1,'rgba(255,255,255,0)'); q.fillStyle=r; q.fillRect(0,0,T,T);}));
   at(14,mk2(q=>{const r=q.createLinearGradient(0,0,0,T); r.addColorStop(0,'rgba(255,255,255,0)'); r.addColorStop(.5,'rgba(255,255,255,1)'); r.addColorStop(1,'rgba(255,255,255,0)'); q.fillStyle=r; q.fillRect(0,0,T,T);}));
   at(15,MFL.warm&&MFL.warm[0]&&mk2(q=>q.drawImage(MFL.warm[0],0,64,256,128)));
+  const drop=(q,x,y,rx,ry)=>{const r=q.createRadialGradient(x-rx*.25,y-ry*.3,2,x,y,Math.max(rx,ry)); r.addColorStop(0,'rgb(255,255,255)'); r.addColorStop(.55,'rgb(205,205,205)'); r.addColorStop(.92,'rgb(130,130,130)'); r.addColorStop(1,'rgba(110,110,110,0)'); q.fillStyle=r; q.beginPath(); q.ellipse(x,y,rx,ry,0,0,7); q.fill();};
+  at(16,mk2(q=>{drop(q,128,128,104,104); q.fillStyle='rgba(0,255,0,.9)'; q.beginPath(); q.ellipse(98,92,24,15,-.6,0,7); q.fill();}));
+  at(17,mk2(q=>{const r=q.createRadialGradient(128,128,0,128,128,120); r.addColorStop(0,'rgba(230,230,230,.35)'); r.addColorStop(1,'rgba(230,230,230,0)'); q.fillStyle=r; q.fillRect(0,0,256,256);
+    for(let i=0;i<90;i++){const a=Math.random()*6.28, d=Math.pow(Math.random(),.7)*110, rr2=1.5+Math.random()*5; q.fillStyle=`rgba(225,225,225,${.4+Math.random()*.5})`; q.beginPath(); q.arc(128+Math.cos(a)*d,128+Math.sin(a)*d,rr2,0,7); q.fill();}}));
+  at(18,mk2(q=>{q.fillStyle='rgb(200,200,200)'; q.beginPath(); q.moveTo(20,128); q.quadraticCurveTo(120,112,170,100); q.arc(190,128,30,-Math.PI/2-.35,Math.PI/2+.35); q.quadraticCurveTo(120,144,20,128); q.fill(); drop(q,188,128,30,30); q.fillStyle='rgba(0,255,0,.9)'; q.beginPath(); q.ellipse(180,116,10,6,-.4,0,7); q.fill();}));
+  at(19,mk2(q=>drop(q,128,128,104,104)));
   const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
 }
 function pSys(n,add){
@@ -8911,10 +8977,10 @@ function pSys(n,add){
   const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:add?THREE.AdditiveBlending:THREE.NormalBlending,uniforms:{map:{value:PFX.atlas},uAmb:{value:new THREE.Color(1,1,1)}},
     vertexShader:`attribute vec3 iPos; attribute vec4 iCol; attribute vec4 iP; varying vec2 vUv; varying vec4 vC;
       void main(){ float c=cos(iP.z), s=sin(iP.z); vec2 q=position.xy*iP.xy; q=vec2(q.x*c-q.y*s,q.x*s+q.y*c);
-        float t=iP.w, col=mod(t,4.), row=floor(t/4.); vUv=vec2((uv.x+col)/4., 1.-(1.-uv.y+row)/4.); vC=iCol;
+        float t=iP.w, col=mod(t,4.), row=floor(t/4.); vUv=vec2((uv.x+col)/4., 1.-(1.-uv.y+row)/5.); vC=iCol;
         gl_Position=projectionMatrix*modelViewMatrix*vec4(iPos+vec3(q,0.),1.); }`,
     fragmentShader:add?`uniform sampler2D map; varying vec2 vUv; varying vec4 vC; void main(){ vec4 t=texture2D(map,vUv); gl_FragColor=vec4(t.rgb*vC.rgb*t.a*vC.a,1.); }`
-      :`uniform sampler2D map; uniform vec3 uAmb; varying vec2 vUv; varying vec4 vC; void main(){ vec4 t=texture2D(map,vUv); float a=t.a*vC.a; if(a<.004) discard; gl_FragColor=vec4(t.rgb*vC.rgb*uAmb,a); }`});
+      :`uniform sampler2D map; uniform vec3 uAmb; varying vec2 vUv; varying vec4 vC; void main(){ vec4 t=texture2D(map,vUv); float a=t.a*vC.a; if(a<.004) discard; float sp=max(0.,t.g-t.r); gl_FragColor=vec4(t.r*vC.rgb*uAmb*(1.-sp)+vec3(sp)*uAmb*1.15,a); }`});
   const mesh=new THREE.Mesh(g,m); mesh.frustumCulled=false; mesh.renderOrder=add?6:5; R3S.dyn.add(mesh);
   return {g,P,C,X,n,i:0,mesh,m};
 }
@@ -8928,7 +8994,8 @@ function r3SyncFx(){
   const N=PFX.N, A=PFX.A; N.i=0; A.i=0; const ak=AMB3[MAP.theme]||1; N.m.uniforms.uAmb.value.setRGB(ak,ak*.98,ak*.96);
   for(const f of fx){const z=f.z!==undefined?f.z:(f.zz!==undefined?f.zz:(f.zz=rnd(-14,14)));
     switch(f.t){
-      case 'blood':{const c=hc(f.c), sp=Math.hypot(f.vx,f.vy); pq(N,f.x,f.y,z,Math.max(f.s*1.4,sp*.016),f.s*1.1,Math.atan2(-f.vy,f.vx),12,c[0],c[1],c[2],1); break;}
+      case 'blood':{const c=hc(f.c), sp=Math.hypot(f.vx,f.vy), fast=sp>140; pq(N,f.x,f.y,z,fast?Math.max(f.s*2.2,sp*.022):f.s*1.6,f.s*(fast?1.3:1.5),Math.atan2(-f.vy,f.vx),fast?18:16,c[0]*1.15,c[1]*1.1,c[2]*1.1,1); break;}
+      case 'bmist':{const c=hc(f.c); pq(N,f.x,f.y,z,f.s*2.6,f.s*2.6,(f.sd=f.sd??Math.random()*6),17,c[0],c[1],c[2],clamp(f.life/f.max,0,1)*.5); break;}
       case 'acide': pq(N,f.x,f.y,z,f.s*1.6,f.s*1.6,0,12,.62,.95,.27,clamp(f.life/f.max,0,1)*.85); break;
       case 'drop':{const c=hc(f.c); pq(N,f.x,f.y,z,f.s*2,f.s*2,0,12,c[0],c[1],c[2],clamp(f.life*2,0,1)); break;}
       case 'smoke':{if(f.sv===undefined){f.sv=(Math.random()*3)|0; f.sr=rnd(-.5,.5); f.sp=rnd(-.35,.35);} const a=clamp(f.life/f.max,0,1)*clamp((f.max-f.life)*7,0,1), c=SMC[f.c]||[.66,.67,.7];
@@ -8944,7 +9011,7 @@ function r3SyncFx(){
       case 'spark':{const c=hc(f.col), sp=Math.hypot(f.vx,f.vy); pq(A,f.x,f.y,z*.3,Math.max(3,sp*.026),2,Math.atan2(-f.vy,f.vx),10,c[0]*1.4,c[1]*1.3,c[2]*1.2,clamp(f.life/f.max,0,1)); break;}
     }}
   for(const a of amb){if(a.t==='snow') pq(N,a.x,a.y,(a.zz=a.zz??rnd(-200,60)),a.s*2.2,a.s*2.2,0,12,1,1,1,.9); else if(a.t==='rain') pq(N,a.x,a.y,(a.zz=a.zz??rnd(-200,60)),1.2,16,.17,14,.75,.85,1,.45);
-    else if(a.t==='ash') pq(N,a.x,a.y,(a.zz=a.zz??rnd(-200,60)),a.s*2,a.s*2,0,12,.27,.23,.23,.8); else if(a.t==='mote') pq(A,a.x,a.y,(a.zz=a.zz??rnd(-200,40)),a.s*2.4,a.s*2.4,0,13,.5,.45,.38,.5);}
+    else if(a.t==='ash') pq(N,a.x,a.y,(a.zz=a.zz??rnd(-200,60)),a.s*2,a.s*2,0,12,.27,.23,.23,.8); else if(a.t==='mote') pq(A,a.x,a.y,(a.zz=a.zz??rnd(-200,40)),a.s*1.5,a.s*1.5,0,13,.45,.4,.34,.16);}
   for(const t of trails) pq(N,(t.x1+t.x2)/2,(t.y1+t.y2)/2,10,Math.hypot(t.x2-t.x1,t.y2-t.y1)+t.w,t.w,Math.atan2(-(t.y2-t.y1),t.x2-t.x1),14,.86,.92,1,t.life*.7);
   for(const t of tracers){const dx=t.x2-t.x1, dy=t.y2-t.y1, L=Math.hypot(dx,dy)||1, h=clamp((1-t.life)*1.3+.12,0,1), h0=Math.max(0,h-Math.min(.6,170/L)), x0=t.x1+dx*h0, y0=t.y1+dy*h0, x1=t.x1+dx*h, y1=t.y1+dy*h, an=Math.atan2(-dy,dx);
     pq(A,(x0+x1)/2,(y0+y1)/2,4,Math.hypot(x1-x0,y1-y0),t.big?4:2.6,an,10,1.4,1.15,.8,1); r3Light(x1,y1,t.big?90:60,0xffcf88,.6);}
@@ -8978,11 +9045,28 @@ function decTex(kind){
   else {g.drawImage(TX.scorch||c,0,0,128,128);}
   const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
 }
+function splatTex(kind){
+  const S=256, prims=[], R=()=>Math.random();
+  if(kind==='blood'){prims.push([128,128,66,62,0,.12]); for(let i=0;i<16;i++){const a=R()*6.28, d=82+R()*34, r=3+R()*8; prims.push([128+Math.cos(a)*d,128+Math.sin(a)*d,r,r,0,.05]);} for(let i=0;i<6;i++){const a=R()*6.28, d=70+R()*14; prims.push([128+Math.cos(a)*d,128+Math.sin(a)*d,16,4,a,.05]);}}
+  else if(kind==='bdir'){prims.push([78,128,52,34,0,.12]); for(let i=0;i<6;i++) prims.push([138+i*19,128+(R()-.5)*20,15-i*1.8,6.5-i*.8,(R()-.5)*.3,.05]); for(let i=0;i<10;i++) prims.push([150+R()*100,128+(R()-.5)*60,1.5+R()*4,1.5+R()*4,0,0]);}
+  else if(kind==='drip'){prims.push([128,34,34,26,0,.1]); for(let i=0;i<9;i++) prims.push([128+Math.sin(i*.9)*2,62+i*17,13-i*.8,13,0,.03]); prims.push([128,222,14,15,0,.04]);}
+  else prims.push([128,128,112,106,0,.07]);
+  const path=(g,p,k)=>{const [x,y,rx,ry,rot,nz]=p, ph=p[0]*.13+p[1]*.07; g.beginPath(); for(let i=0;i<=48;i++){const a=i/48*6.283, f=(1+nz*(Math.sin(a*5+ph)*.6+Math.sin(a*11+ph*2)*.4))*k, px=Math.cos(a)*rx*f, py=Math.sin(a)*ry*f, c=Math.cos(rot), s2=Math.sin(rot); const X=x+px*c-py*s2, Y=y+px*s2+py*c; i?g.lineTo(X,Y):g.moveTo(X,Y);} g.fill();};
+  const h=document.createElement('canvas'); h.width=h.height=S; const hg=h.getContext('2d'); hg.fillStyle='#000'; hg.fillRect(0,0,S,S);
+  for(let k=0;k<12;k++){hg.fillStyle=`rgba(255,255,255,${k?.09:.25})`; for(const p of prims) path(hg,p,1-k*.06);}
+  const c=document.createElement('canvas'); c.width=c.height=S; const g=c.getContext('2d'); g.fillStyle='#fff'; for(const p of prims) path(g,p,1);
+  const im=g.getImageData(0,0,S,S), hd=hg.getImageData(0,0,S,S).data, d=im.data;
+  for(let i=0;i<d.length;i+=4){const v=255-hd[i]*.42; d[i]=d[i+1]=d[i+2]=v;}
+  g.putImageData(im,0,0);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; const n=new THREE.CanvasTexture(normalFrom(h,5)); return [t,n];
+}
 function r3DecalInit(){
-  const geo=new THREE.PlaneGeometry(1,1);
-  for(const [k,n,o] of [['hole',600,{roughness:.9}],['blood',700,{roughness:.18,metalness:0}],['scorch',80,{roughness:1}]]){
-    const m=new THREE.InstancedMesh(geo,STD(Object.assign({map:decTex(k),transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4},o)),n);
-    m.count=0; m.frustumCulled=false; m.receiveShadow=true; m.renderOrder=1; m.setColorAt(0,new THREE.Color()); R3S.dyn.add(m); DEC[k]={m,n,i:0,full:false};}
+  const geo=new THREE.PlaneGeometry(1,1), base={transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4};
+  for(const [k,n,o] of [['hole',600,{roughness:.9}],['scorch',80,{roughness:1}]]){
+    const m=new THREE.InstancedMesh(geo,STD(Object.assign({map:decTex(k)},base,o)),n); m.count=0; m.frustumCulled=false; m.receiveShadow=true; m.renderOrder=1; m.setColorAt(0,new THREE.Color()); R3S.dyn.add(m); DEC[k]={m,n,i:0,full:false};}
+  for(const [k,n] of [['blood',500],['bdir',300],['drip',300],['pool',260]]){const [t,nm]=splatTex(k);
+    const m=new THREE.InstancedMesh(geo,new THREE.MeshPhysicalMaterial(Object.assign({map:t,normalMap:nm,normalScale:new THREE.Vector2(1.2,1.2),roughness:.16,metalness:0,clearcoat:1,clearcoatRoughness:.03},base)),n);
+    m.count=0; m.frustumCulled=false; m.receiveShadow=true; m.renderOrder=k==='pool'?1:2; m.setColorAt(0,new THREE.Color()); R3S.dyn.add(m); DEC[k]={m,n,i:0,full:false};}
   R3S.pools=new Map();
 }
 function r3DecalReset(){for(const k in DEC){DEC[k].i=0; DEC[k].full=false; DEC[k].m.count=0;} if(R3S.pools) R3S.pools.clear();}
@@ -8996,15 +9080,21 @@ function r3Decal(kind,x,y,a,b,c,d){
   if(!R3.ok||!DEC.hole) return;
   try{
     if(kind==='hole'){const nx=a, ny=b, k=c, metal=k==='metal'||k==='grille'||k==='conteneur', s=metal?4.2:k==='glace'?9:6; decPut('hole',x,y,rnd(-3,3),nx,ny,s,s,metal?'#d9dee4':k==='bois'?'#c9a070':'#ffffff');}
-    else if(kind==='blood'){const s=a, side=b, rgb=c; const col='#'+rgb.split(',').map(v=>(+v).toString(16).padStart(2,'0')).join('');
-      if(side) decPut('blood',x,y,rnd(-10,10),0,0,s*2.2,s*3.4,col,0); else decPut('blood',x,y,rnd(-16,16),0,-1,s*rnd(3,5.5),s*rnd(2.5,4.5),col);}
+    else if(kind==='blood'){const s=a, side=b, rgb=c, vx=d||0; const col='#'+rgb.split(',').map(v=>(+v).toString(16).padStart(2,'0')).join('');
+      if(side){const nx=vx>0?-1:vx<0?1:(Math.random()<.5?-1:1), L=s*rnd(4,8); decPut('drip',x,y+L*.42,rnd(-12,12),nx,0,s*2.4,L,col,0);}
+      else if(Math.abs(vx)>90) decPut('bdir',x,y,rnd(-16,16),0,-1,s*rnd(5,7.5),s*rnd(2.6,3.6),col,vx>0?0:Math.PI);
+      else decPut('blood',x,y,rnd(-16,16),0,-1,s*rnd(3,5.5),s*rnd(2.8,5),col);}
     else if(kind==='scorch') decPut('scorch',x,y,rnd(-20,20),0,-1,a*2.2,a*1.6,'#ffffff');
   }catch(_){}
 }
 function r3PoolTick(){
-  for(const r of bodies){const P=r.pool; if(!P||!r.bcol) continue; let e=R3S.pools.get(P); const col=BLOODS[r.bcol].p;
-    if(!e){e={i:decPut('blood',P.x,P.y,0,0,-1,1,1,col,Math.random()*6.28)}; R3S.pools.set(P,e); e.rot=Math.random()*6.28;}
-    decPut('blood',P.x,P.y,0,0,-1,P.R*2.1,P.R*1.7,mixHex(col,'#000000',.25),e.rot,e.i);}
+  for(const r of bodies){const P=r.pool; if(!P||!r.bcol) continue; let e=R3S.pools.get(P); const col=mixHex(BLOODS[r.bcol].p,'#000000',.1);
+    if(!e){e={rot:Math.random()*6.28,z:rnd(2,10),lobes:[],drips:[]}; e.i=decPut('pool',P.x,P.y,e.z,0,-1,1,1,col,e.rot);
+      for(let k=0,n=2+(Math.random()*3|0);k<n;k++){const a=rnd(0,6.28); e.lobes.push({a,d:rnd(.45,.8),k:rnd(.35,.6),r:rnd(0,6.28),i:decPut('pool',P.x,P.y,e.z,0,-1,1,1,col,0)});} R3S.pools.set(P,e);}
+    const R=P.R*1.15; decPut('pool',P.x,P.y,e.z,0,-1,R*2,R*1.6,col,e.rot,e.i);
+    for(const L of e.lobes) decPut('pool',P.x+Math.cos(L.a)*R*L.d,P.y,e.z+Math.sin(L.a)*R*L.d*.8,0,-1,R*L.k*2,R*L.k*1.7,col,L.r,L.i);
+    if(e.z+R*.82>ZF-1&&e.drips.length<3&&Math.random()<.03){const dx=P.x+rnd(-R*.6,R*.6); e.drips.push({x:dx,L:2,i:decPut('drip',dx,P.y+2,ZF+.3,0,0,3,4,col,0)});}
+    for(const d of e.drips){if(d.L<34) d.L+=.22; decPut('drip',d.x,P.y+d.L*.45,ZF+.35,0,0,3.4,d.L,col,0,d.i);}}
 }
 
 /* ---------- Interface : catalogue ---------- */
@@ -9144,7 +9234,7 @@ function renderInsp(){
   let h=`<div class="ih"><b>${r.name}</b><span class="st ${st[0]}">${st[1]}</span><button class="ib" data-i="min" title="${S.inspMin?'Développer':'Réduire'}" aria-label="${S.inspMin?'Développer':'Réduire'}">${svg(S.inspMin?'plus':'min')}</button><button class="ib" data-i="close" title="Fermer" aria-label="Fermer">${svg('x')}</button></div>`;
   if(!r.C.noBleed) h+=`<div class="row"><span>Sang</span>${bar(r.blood/100)}<span class="cause">${fmt(r.blood)} %${r.bleed>.3?' · saigne':''}</span></div>`;
   if(!S.inspMin){
-    const tg=[r.C.nom]; if(r.adren>0) tg.push('Adrénaline'); if(r.shock>0) tg.push('Électrocuté'); if(r.pts[0].liq&&!r.C.noDrown) tg.push(`Air ${fmt(Math.max(0,r.air)*10)} %`);
+    const tg=[r.C.nom]; if(r.wounds.length) tg.push(`Plaies ${r.wounds.length}`); if(r.bruises&&r.bruises.length) tg.push(`Hématomes ${r.bruises.length}`); if(r.adren>0) tg.push('Adrénaline'); if(r.shock>0) tg.push('Électrocuté'); if(r.pts[0].liq&&!r.C.noDrown) tg.push(`Air ${fmt(Math.max(0,r.air)*10)} %`);
     if(r.dos==='jetpack') tg.push(`Carburant ${fmt(r.fuel/14*100)} %`); if(r.shield) tg.push(`${BOUCLIERS[r.shield.kind].nom} ${fmt(r.shield.integ/r.shield.max*100)} %`);
     if(r.balloons.length) tg.push(`Ballons ${r.balloons.filter(b=>b.alive).length}/3`); if(r.combi!=='aucune') tg.push(COMBIS[r.combi].nom); if(r.exo) tg.push('Exosquelette');
     h+=`<div class="ibody">${bodySvg(r)}<div class="tags">${tg.map(t=>`<span>${t}</span>`).join('')}</div></div>`;
@@ -9177,7 +9267,7 @@ function setPause(v){S.paused=v; const b=$('#b-pause'); b.setAttribute('aria-pre
 $('#b-pause').onclick=()=>setPause(!S.paused);
 $('#b-slow').onclick=()=>setSlow(!S.slow);
 $('#b-son').onclick=()=>{S.muted=!S.muted; const b=$('#b-son'); b.setAttribute('aria-pressed',S.muted); b.innerHTML=svg(S.muted?'muet':'son'); b.title=S.muted?'Remettre le son':'Couper le son'; b.setAttribute('aria-label',b.title);};
-$('#b-sang').onclick=()=>{sctx.clearRect(0,0,stain.width,stain.height); if(R3.ok) r3DecalReset();for(const r of bodies) r.wounds=[]; for(const g of gadgets) g.blood=null; toast('Sang et traces nettoyés.');};
+$('#b-sang').onclick=()=>{sctx.clearRect(0,0,stain.width,stain.height); if(R3.ok) r3DecalReset();for(const r of bodies){r.wounds=[]; r.bruises=[]; r.pool=null;} for(const g of gadgets) g.blood=null; toast('Sang et traces nettoyés.');};
 $('#b-reset').onclick=()=>loadMap(S.map);
 $('#z-in').onclick=()=>setZoom(cam.z*1.25); $('#z-out').onclick=()=>setZoom(cam.z/1.25);
 $('#z-follow').onclick=()=>setFollow(!cam.follow);
@@ -9259,7 +9349,11 @@ function bodySvg(r){
   const col=k=>{if(r.cut[k]) return 'rgba(255,255,255,.05)'; const q=clamp(r.parts[k].hp/r.parts[k].max,0,1); return q>.6?`rgba(70,214,140,${.35+.55*q})`:q>.3?'rgba(255,190,60,.85)':q>0?'rgba(255,92,70,.9)':'rgba(120,20,20,.9)';};
   const st=k=>r.cut[k]?'stroke="rgba(255,90,70,.8)" stroke-width="1.2" stroke-dasharray="3 3"':r.parts[k].armor?'stroke="#b9dcff" stroke-width="2.4"':'stroke="rgba(255,255,255,.22)" stroke-width="1"';
   const P={tete:'<circle cx="38" cy="15" r="11"', torse:'<rect x="25" y="29" width="26" height="46" rx="9"', brasD:'<rect x="11" y="31" width="11" height="48" rx="5.5"', brasG:'<rect x="54" y="31" width="11" height="48" rx="5.5"', jambeD:'<rect x="25" y="78" width="12" height="54" rx="6"', jambeG:'<rect x="39" y="78" width="12" height="54" rx="6"'};
-  return `<svg class="body" viewBox="0 0 76 134" aria-hidden="true">${PART_ORDER.map(k=>`${P[k]} fill="${col(k)}" ${st(k)}/>`).join('')}</svg>`;
+  const CP={tete:[38,15],torse:[38,50],brasD:[16.5,56],brasG:[59.5,56],jambeD:[31,104],jambeG:[45,104]}, nb={}, nw={};
+  for(const b of r.bruises||[]){const p=r.bones[b.bi]&&r.bones[b.bi].part; if(p) nb[p]=(nb[p]||0)+1;}
+  for(const w of r.wounds){const p=r.bones[w.bi]&&r.bones[w.bi].part; if(p) nw[p]=(nw[p]||0)+1;}
+  const marks=PART_ORDER.map(k=>{const [x,y]=CP[k]; return (nb[k]?`<circle cx="${x-3}" cy="${y}" r="${Math.min(5,2.6+nb[k]*.6)}" fill="rgba(122,70,190,.95)" stroke="#fff" stroke-width=".7"/>`:'')+(nw[k]?`<circle cx="${x+3}" cy="${y+4}" r="${Math.min(5,2.4+nw[k]*.5)}" fill="rgba(150,10,20,.95)" stroke="#fff" stroke-width=".7"/>`:'');}).join('');
+  return `<svg class="body" viewBox="0 0 76 134" aria-hidden="true">${PART_ORDER.map(k=>`${P[k]} fill="${col(k)}" ${st(k)}/>`).join('')}${marks}</svg>`;
 }
 const hot=window.claude&&window.claude.hot;
 function start(data){

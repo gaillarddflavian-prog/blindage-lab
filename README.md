@@ -21,7 +21,11 @@ Dans le menu principal, choisissez **Mode 3D** : vous vous déplacez librement �
 | Souris · clic gauche | Viser · tirer ou utiliser l'objet en main |
 | Clic droit ou V | Viser avec l'arme (zoom, lunette) |
 | G · E | Lancer une grenade · placer le personnage choisi |
+| 1 à 8 · molette · Q | Changer d'arme ou d'objet (inventaire) |
+| L | Allumer / éteindre le laser de visée |
 | M · R | Arsenal · recommencer la carte |
+
+Chaque arme ou objet pris dans l'arsenal s'ajoute à l'**inventaire** (8 emplacements, en bas de l'écran) ; touchez une case pour changer, appui long pour la retirer.
 
 Sur iPhone : joystick à gauche pour avancer, glissez à droite pour regarder, boutons **FEU**, **VISER**, **SAUT**, **GRENADE** et **+** (mannequin).
 

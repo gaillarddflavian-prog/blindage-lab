@@ -10,6 +10,21 @@ Bac à sable balistique en **3D temps réel** : testez armes, blindages et explo
 2. iPhone : bouton **Partager** → **Sur l'écran d'accueil**. Android : menu ⋮ → **Installer l'application**.
 3. Le jeu s'ouvre en plein écran avec son icône et fonctionne **hors connexion**. Tenez le téléphone à l'horizontale.
 
+## Mode 3D (nouveau)
+
+Dans le menu principal, choisissez **Mode 3D** : vous vous déplacez librement à la première personne dans un stand de tir couvert ou sur un terrain extérieur.
+
+| Ordinateur | Action |
+|---|---|
+| Clic dans la scène | Prendre la souris |
+| ZQSD / WASD | Se déplacer (Maj : courir, Espace : sauter, C : s'accroupir) |
+| Souris · clic gauche | Viser · tirer ou utiliser l'objet en main |
+| Clic droit ou V | Viser avec l'arme (zoom, lunette) |
+| G · E | Lancer une grenade · placer le personnage choisi |
+| M · R | Arsenal · recommencer la carte |
+
+Sur iPhone : joystick à gauche pour avancer, glissez à droite pour regarder, boutons **FEU**, **VISER**, **SAUT**, **GRENADE** et **+** (mannequin).
+
 ## Commandes
 
 | Touche | Action |

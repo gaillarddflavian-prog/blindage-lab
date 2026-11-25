@@ -29,6 +29,10 @@ Chaque arme ou objet pris dans l'arsenal s'ajoute à l'**inventaire** (8 emplace
 
 Sur iPhone : joystick à gauche pour avancer, glissez à droite pour regarder, boutons **FEU**, **VISER**, **SAUT**, **GRENADE** et **+** (mannequin).
 
+## Labo d'impact (dégâts simulés grain par grain)
+
+Menu → **Labo d'impact**, ou le bouton « Coupe » en 3D. La cible est vue en coupe : chaque grain de matière a sa densité, sa rigidité, sa limite élastique et sa résistance. Les liaisons plient, chauffent puis cassent. On voit la pénétration, les ricochets, l'écaillage, les éclats, la céramique qui se brise, le métal qui s'ouvre en pétales, la chair déchirée, et les explosifs (charge creuse, blindage réactif).
+
 ## Commandes
 
 | Touche | Action |

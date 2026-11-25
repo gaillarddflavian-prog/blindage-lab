@@ -356,6 +356,7 @@ html,body{overscroll-behavior:none;-webkit-touch-callout:none;-webkit-tap-highli
     <div class="brand"><h1>BLINDAGE LAB</h1><span class="chip" id="mapname">Stand de tir</span></div>
     <button id="hud" title="Bilan de la séance" aria-expanded="false" aria-controls="bilan"></button>
     <div class="ctl">
+      <button class="ib" id="b-imp" title="Labo d’impact : voir les dégâts en coupe" aria-label="Labo d’impact"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h7M10 9l4 3-4 3M15 4v16M18 4v16"/></svg></button>
       <button class="ib" id="b-menu" title="Menu principal (Échap)" aria-label="Menu principal"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
       <button class="ib" id="b-cine" aria-pressed="false" title="Mode cinéma (H)" aria-label="Mode cinéma"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/></svg></button>
       <button class="ib" id="b-pause" aria-pressed="false" title="Pause (Espace)" aria-label="Pause"><svg class="i" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg></button>
@@ -392,6 +393,7 @@ html,body{overscroll-behavior:none;-webkit-touch-callout:none;-webkit-tap-highli
         <nav class="t-menu">
           <button data-t="play" class="pri t-g3">Jouer en 3D <em>1re personne</em> <kbd>Entrée</kbd></button>
           <button data-t="profil">Vue de profil</button>
+          <button data-t="imp" class="t-g3">Labo d’impact <em>Particules</em></button>
           <button data-t="armes">Arsenal</button>
           <button data-t="perso">Personnages</button>
           <button data-t="equip">Équipement</button>
@@ -9489,7 +9491,7 @@ function g3World(r,w){ // position monde d'une blessure stockée en local
 }
 function g3Damage(r,hit,o,d,E,baseE,dmg,kind,src){
   const bi=hit.bi, part=r.bones[bi].part, Pp=r.parts[part], D=PARTS_DEF[part], q=v3(o.x+d.x*hit.s,o.y+d.y*hit.s,o.z+d.z*hit.s), loc=g3Local(r,bi,hit.t,q);
-  G3.sel=r; r.hitT=.2; G3.hitM=.22;
+  G3.sel=r; r.hitT=.2; G3.hitM=.22; G3.lastPart=part;
   if(kind==='masse'){let dd=dmg*D.mul; if(Pp.armor){const M=MATS[Pp.armor.mat]; Pp.armor.integ-=E/Math.max(M.stop,200)*M.integ*.12*M.brit+3; dd*=.45+.4*M.blunt; if(Pp.armor.integ<=0){Pp.armor=null; g3Text(q,'DÉTRUIT','mid');}}
     g3Hurt(r,part,dd,dd>30,loc,'masse'); g3Push(r,bi,d,E*.45+200); g3Text(q,'CHOC −'+Math.round(dd),'mid'); sfx('chair'); return 0;}
   if(Pp.armor){const res=armorHit(Pp.armor,E,kind), M=MATS[Pp.armor.mat];
@@ -10048,7 +10050,7 @@ function g3UI(){
   <section class="g3tgt" id="g3tgt" hidden aria-live="polite"></section>
   <nav class="g3bar" id="g3bar" aria-label="Inventaire"></nav>
   <div class="g3wpn"><small id="g3-cat"></small><b id="g3-name"></b><span id="g3-meta"></span>
-    <div class="g3acts"><button class="pri" id="g3-arsenal">Arsenal<kbd>M</kbd></button><button id="g3-perso">Personnages</button><button id="g3-laser" aria-pressed="true" title="Laser de visée (L)">Laser<kbd>L</kbd></button><button id="g3-spawnk" title="Placer le personnage choisi devant vous">+ Mannequin<kbd>E</kbd></button></div></div>
+    <div class="g3acts"><button class="pri" id="g3-arsenal">Arsenal<kbd>M</kbd></button><button id="g3-perso">Personnages</button><button id="g3-laser" aria-pressed="true" title="Laser de visée (L)">Laser<kbd>L</kbd></button><button id="g3-imp" title="Voir le dernier impact en coupe, grain par grain">Coupe</button><button id="g3-spawnk" title="Placer le personnage choisi devant vous">+ Mannequin<kbd>E</kbd></button></div></div>
   <div class="g3touch" id="g3touch" hidden><div class="g3stick" id="g3stick"><i></i></div>
     <button class="g3b fire" id="g3fire" aria-label="Tirer">FEU</button><button class="g3b aim" id="g3aim" aria-label="Viser">VISER</button><button class="g3b jump" id="g3jump" aria-label="Sauter">SAUT</button>
     <button class="g3b gren" id="g3gren" aria-label="Lancer une grenade">GRENADE</button><button class="g3b spawn" id="g3spawn" aria-label="Placer un mannequin">+</button></div>
@@ -10063,6 +10065,8 @@ function g3UI(){
   $$('g3-perso').onclick=e=>{e.stopPropagation(); g3Unlock(); openCat('perso');};
   $$('g3-spawnk').onclick=e=>{e.stopPropagation(); g3Spawn();};
   $$('g3-laser').onclick=e=>{e.stopPropagation(); laserToggle();};
+  $$('g3-imp').onclick=e=>{e.stopPropagation(); const r=G3.aimR||(G3.sel&&G3.rags.includes(G3.sel)?G3.sel:null), part=G3.lastPart||'torse', a=r&&r.parts[part]&&r.parts[part].armor;
+    impOpen({weapon:S.hand.cat==='armes'?curW():null,tgt:impTgtFor(part,a&&a.mat)});};
   // barre d'inventaire : toucher pour prendre, appui long ou clic droit pour retirer
   const bar=$$('g3bar'); let lp=null, lpDone=false;
   bar.addEventListener('click',e=>{e.stopPropagation(); if(lpDone){lpDone=false; return;} const b=e.target.closest('button'); if(!b) return; if(b.dataset.add){g3Unlock(); openCat(S.hand.cat==='perso'?'armes':S.hand.cat); return;} const r=S.recent[+b.dataset.i]; if(r) takeHand(r.cat,r.id);});
@@ -10370,6 +10374,472 @@ function laser2D(){
   ctx.restore();
 }
 
+/* =====================================================================
+   LABO D'IMPACT — dégâts simulés par particules, vue en coupe 2D
+   Chaque matériau est un réseau de particules liées : les liaisons
+   plient (plasticité), chauffent, puis cassent ; les contacts font le
+   reste (pénétration, ricochet, écaillage, éclats, fusion, explosions).
+   Unités internes : mm, µs, mg → force kN, pression GPa, vitesse mm/µs (km/s)
+   ===================================================================== */
+const IMAT={ // rho g/cm³, E GPa, ey déformation élastique, ef déformation plastique avant rupture, et/ec rupture en traction/compression, an anisotropie entre plis
+  rha:{nom:'Acier de blindage',col:'#76808b',rho:7.85,E:200,ey:.0055,ef:.45,et:9,damp:.12,cp:460,melt:1450,va:.06},
+  hhs:{nom:'Acier haute dureté',col:'#8b96a2',rho:7.85,E:205,ey:.0085,ef:.18,et:9,damp:.12,cp:460,melt:1450,va:.08},
+  alu:{nom:'Aluminium',col:'#c4cbd3',rho:2.66,E:70,ey:.0035,ef:.35,et:9,damp:.12,cp:900,melt:640,va:.06},
+  titane:{nom:'Titane',col:'#a29db5',rho:4.43,E:114,ey:.0085,ef:.25,et:9,damp:.12,cp:530,melt:1660,va:.06},
+  ceram:{nom:'Céramique',col:'#ece6d8',rho:3.9,E:370,brittle:1,et:.0012,ec:.009,damp:.15,cp:800,melt:2070,va:.3},
+  b4c:{nom:'Carbure de bore',col:'#5f636b',rho:2.52,E:450,brittle:1,et:.001,ec:.008,damp:.15,cp:950,melt:2760,va:.3},
+  uhmwpe:{nom:'Fibres polyéthylène',col:'#f1eee3',rho:.97,E:25,ey:.06,ef:3.2,et:9,an:.12,damp:.25,cp:1900,melt:145,va:.1},
+  kevlar:{nom:'Kevlar',col:'#d4bc60',rho:1.44,E:30,ey:.045,ef:2.6,et:9,an:.15,damp:.25,cp:1400,melt:450,va:.1},
+  cuir:{nom:'Cuir',col:'#7a4b2a',rho:.95,E:1.2,ey:.03,ef:.9,et:9,damp:.3,cp:1500,melt:200,va:.1},
+  verre:{nom:'Verre',col:'#a4d6df',rho:2.5,E:70,brittle:1,et:.0007,ec:.012,damp:.1,cp:840,melt:1400,va:.25},
+  beton:{nom:'Béton',col:'#9d988c',rho:2.4,E:30,brittle:1,et:.0003,ec:.0045,damp:.15,cp:880,melt:1500,va:.5},
+  bois:{nom:'Bois',col:'#a8763f',rho:.75,E:12,ey:.007,ef:.3,et:9,an:.1,damp:.2,cp:1700,melt:300,fl:1,va:.2},
+  gel:{nom:'Gélatine',col:'#dcbd6a',rho:1.06,E:2.2,ey:.0012,ef:1.2,et:9,damp:.18,cp:4000,melt:60,va:.03,soft:1,cd:0.5,sig:0.0022},
+  peau:{nom:'Peau',col:'#d59c7a',rho:1.1,E:2.4,ey:.006,ef:1.4,et:9,damp:.18,cp:3500,melt:100,va:.06,soft:1,tissu:1,cd:0.7,sig:0.012},
+  graisse:{nom:'Graisse',col:'#efd18b',rho:.92,E:2,ey:.001,ef:1,et:9,damp:.18,cp:2300,melt:100,va:.06,soft:1,tissu:1,cd:0.45,sig:0.0012},
+  muscle:{nom:'Muscle',col:'#a5352f',rho:1.06,E:2.3,ey:.0018,ef:1,et:9,damp:.18,cp:3400,melt:100,va:.08,soft:1,tissu:1,cd:0.55,sig:0.003},
+  os:{nom:'Os',col:'#ede4cd',rho:1.9,E:17,brittle:1,et:.007,ec:.025,damp:.2,cp:1300,melt:1600,va:.2,tissu:1},
+  moelle:{nom:'Moelle',col:'#c99a52',rho:1,E:2,ey:.001,ef:1,et:9,damp:.18,cp:3000,melt:100,va:.06,soft:1,tissu:1,cd:0.5,sig:0.0015},
+  poumon:{nom:'Poumon',col:'#dd9aa1',rho:.35,E:.6,ey:.003,ef:1.2,et:9,damp:.18,cp:3500,melt:100,va:.15,soft:1,tissu:1,cd:0.4,sig:0.0006},
+  coeur:{nom:'Cœur',col:'#8a1b21',rho:1.06,E:2.3,ey:.0018,ef:1,et:9,damp:.18,cp:3600,melt:100,va:.08,soft:1,tissu:1,cd:0.55,sig:0.003},
+  cerveau:{nom:'Cerveau',col:'#e3b7b5',rho:1.04,E:2.2,ey:.0008,ef:1,et:9,damp:.18,cp:3600,melt:100,va:.05,soft:1,tissu:1,cd:0.5,sig:0.0014},
+  // projectiles
+  plomb:{nom:'Plomb',col:'#90949a',rho:11.34,E:16,ey:.0015,ef:3,et:9,damp:.2,cp:130,melt:327,va:.02},
+  cuivre:{nom:'Cuivre',col:'#cf8049',rho:8.96,E:120,ey:.003,ef:.8,et:9,damp:.15,cp:385,melt:1085,va:.02},
+  acierdoux:{nom:'Acier doux',col:'#6a717a',rho:7.85,E:205,ey:.0032,ef:.35,et:9,damp:.12,cp:460,melt:1450,va:.02},
+  acierp:{nom:'Acier trempé',col:'#59616b',rho:7.85,E:210,ey:.011,ef:.14,et:9,damp:.12,cp:460,melt:1450,va:.02},
+  tungst:{nom:'Alliage de tungstène',col:'#4a4f57',rho:17.6,E:360,ey:.005,ef:.3,et:9,damp:.12,cp:134,melt:3400,va:.02},
+  wc:{nom:'Carbure de tungstène',col:'#3b3f46',rho:15,E:600,brittle:1,et:.003,ec:.015,damp:.15,cp:200,melt:2800,va:.05},
+  explosif:{nom:'Explosif',col:'#cdd04a',rho:1.7,E:6,ey:.01,ef:.3,et:9,damp:.3,cp:1000,melt:200,va:.05,ex:1},
+  plasma:{nom:'Plasma',col:'#b9a2ff',rho:.6,E:1,ey:.0001,ef:99,et:9,damp:.5,cp:1000,melt:-1,va:0,hot:1},
+};
+const IMAT_K=Object.keys(IMAT), IMAT_I=Object.fromEntries(IMAT_K.map((k,i)=>[k,i]));
+const MSOFT=new Uint8Array(IMAT_K.length), MCD=new Float32Array(IMAT_K.length), MSIG=new Float32Array(IMAT_K.length), MRHO=new Float32Array(IMAT_K.length), MEE=new Float32Array(IMAT_K.length), MCP=new Float32Array(IMAT_K.length), MHOT=new Uint8Array(IMAT_K.length), MEX=new Uint8Array(IMAT_K.length), MTIS=new Uint8Array(IMAT_K.length);
+let ICMAX=2.4; // vitesse des ondes plafonnée (raideurs adoucies, contraintes conservées) pour garder le calcul fluide
+function impMatSetup(cm){ ICMAX=cm; IMAT_K.forEach((k,i)=>{const M=IMAT[k], Ee=Math.min(M.E,ICMAX*ICMAX*M.rho), f=Ee/M.E; M.Ee=Ee; M.eyE=M.brittle?9:(M.ey||0)/f; if(M.brittle) M.ef=9; M.etE=M.brittle?M.et/f:9; M.ecE=M.brittle?M.ec/f:9; MEE[i]=Ee; MCP[i]=M.cp; MHOT[i]=M.hot?1:0; MEX[i]=M.ex?1:0; MTIS[i]=M.tissu?1:0; MSOFT[i]=M.soft?1:0; MCD[i]=M.cd||0; MSIG[i]=M.sig||0; MRHO[i]=M.rho;}); }
+impMatSetup(2.4);
+/* ---------- Projectiles (dimensions réelles) ---------- */
+const IPROJ={
+  p9:{nom:'9×19 mm FMJ',cat:'Pistolet',v:360,D:9,m:8,core:'plomb',jacket:.5,nose:.55},
+  p45:{nom:'.45 ACP',cat:'Pistolet',v:285,D:11.5,m:15,core:'plomb',jacket:.5,nose:.45},
+  p44:{nom:'.44 Magnum (plomb nu)',cat:'Pistolet',v:440,D:10.9,m:15.6,core:'plomb',nose:.4},
+  p556:{nom:'5,56×45 mm (pointe acier)',cat:'Fusil',v:940,D:5.7,m:4,core:'plomb',tip:'acierp',tipL:.35,jacket:.4,nose:.75},
+  p762:{nom:'7,62×39 mm (âme acier)',cat:'Fusil',v:715,D:7.9,m:7.9,core:'acierdoux',jacket:.5,nose:.7},
+  p762ap:{nom:'7,62×51 mm perforant (carbure)',cat:'Fusil',v:910,D:7.8,m:8.4,core:'wc',coreD:.7,fill:'plomb',jacket:.5,nose:.75},
+  p338:{nom:'.338 Lapua Magnum',cat:'Précision',v:900,D:8.6,m:16.2,core:'plomb',jacket:.5,nose:.8},
+  p50:{nom:'12,7×99 mm perforant',cat:'Lourd',v:890,D:12.9,m:46,core:'acierp',coreD:.75,fill:'plomb',jacket:.6,nose:.75},
+  slug:{nom:'Calibre 12 – balle',cat:'Fusil à pompe',v:450,D:18.5,m:28,core:'plomb',nose:.3},
+  buck:{nom:'Calibre 12 – chevrotine',cat:'Fusil à pompe',v:400,D:8.4,m:3.5,core:'plomb',pellets:3},
+  he20:{nom:'Obus explosif 20 mm',cat:'Canon',v:1030,D:20,m:100,case:'acierp',caseT:.14,fill:'explosif',nose:.6},
+  ww2:{nom:'Obus perforant 75 mm (1943)',cat:'Char',v:620,D:75,m:6800,core:'acierp',nose:.55,cap:1},
+  apfsds:{nom:'Flèche 120 mm (APFSDS)',cat:'Char',v:1650,D:22,m:4600,core:'tungst',nose:.08},
+  heat:{nom:'Charge creuse 125 mm (HEAT)',cat:'Char',heat:125},
+  he152:{nom:'Obus explosif 152 mm',cat:'Artillerie',v:650,D:152,m:43000,case:'acierp',caseT:.12,fill:'explosif',nose:.55},
+  rail:{nom:'Projectile électromagnétique',cat:'Science-fiction',v:3000,D:14,m:350,core:'tungst',nose:.4},
+  plasma:{nom:'Trait de plasma',cat:'Science-fiction',v:2200,D:12,m:5,core:'plasma',nose:.5},
+};
+/* ---------- Cibles : couches [matériau, épaisseur mm, collée à la précédente, écart avant] ---------- */
+const TORSE=[['peau',2.5,1],['graisse',9,1],['muscle',22,1],['os',9,1,0,'Côte'],['poumon',62,1],['coeur',46,1],['muscle',24,1],['graisse',7,1],['peau',2.5,1]];
+const TETE=[['peau',5,1,0,'Cuir chevelu'],['os',7,1,0,'Crâne'],['cerveau',140,1],['os',7,1,0,'Crâne'],['peau',5,1,0,'Cuir chevelu']];
+const CUISSE=[['peau',2.5,1],['graisse',10,1],['muscle',38,1],['os',6,1,0,'Fémur'],['moelle',16,1],['os',6,1,0,'Fémur'],['muscle',38,1],['graisse',10,1],['peau',2.5,1]];
+const ITGT={
+  torse:{nom:'Torse',cat:'Corps',H:44,L:TORSE},
+  torse_gilet:{nom:'Torse + gilet souple',cat:'Corps',H:44,L:[['kevlar',8,0],...TORSE.map((l,i)=>i?l:[l[0],l[1],0,3])]},
+  torse_plaque:{nom:'Torse + plaque céramique',cat:'Corps',H:44,L:[['ceram',9,0],['uhmwpe',11,1],...TORSE.map((l,i)=>i?l:[l[0],l[1],0,4])]},
+  torse_acier:{nom:'Torse + plaque d’acier',cat:'Corps',H:44,L:[['hhs',6.4,0],...TORSE.map((l,i)=>i?l:[l[0],l[1],0,4])]},
+  tete:{nom:'Tête',cat:'Corps',H:44,L:TETE},
+  tete_casque:{nom:'Tête + casque',cat:'Corps',H:44,L:[['kevlar',8,0],...TETE.map((l,i)=>i?l:[l[0],l[1],0,12,l[4]])]},
+  cuisse:{nom:'Cuisse',cat:'Corps',H:44,L:CUISSE},
+  gel:{nom:'Bloc de gélatine',cat:'Essais',H:70,L:[['gel',260,0]]},
+  acier6:{nom:'Acier 6 mm',cat:'Plaques',H:80,L:[['hhs',6,0]]},
+  acier10:{nom:'Acier 10 mm',cat:'Plaques',H:90,L:[['rha',10,0]]},
+  acier10i:{nom:'Acier 10 mm incliné',cat:'Plaques',H:90,L:[['rha',10,0]],ang:60},
+  alu25:{nom:'Aluminium 25 mm',cat:'Plaques',H:90,L:[['alu',25,0]]},
+  titane:{nom:'Titane 12 mm',cat:'Plaques',H:90,L:[['titane',12,0]]},
+  sapi:{nom:'Céramique + polyéthylène',cat:'Plaques',H:90,L:[['ceram',9,0],['uhmwpe',12,1]]},
+  kevlar:{nom:'Kevlar 10 mm',cat:'Plaques',H:80,L:[['kevlar',10,0]]},
+  verre:{nom:'Vitrage 20 mm',cat:'Matériaux',H:90,L:[['verre',20,0]]},
+  bois:{nom:'Bois 100 mm',cat:'Matériaux',H:120,L:[['bois',100,0]]},
+  beton:{nom:'Mur de béton 200 mm',cat:'Matériaux',H:240,L:[['beton',200,0]]},
+  ww2:{nom:'Char 1943 : acier 80 mm',cat:'Chars',H:320,L:[['rha',80,0]],ang:30},
+  comp:{nom:'Char moderne : composite',cat:'Chars',H:480,L:[['rha',40,0],['ceram',80,1],['rha',30,1],['alu',60,0,10],['rha',60,0,10]],ang:55},
+  era:{nom:'Char : acier + réactif',cat:'Chars',H:460,L:[['rha',4,0],['explosif',6,1],['rha',4,1],['rha',180,0,90]],ang:60},
+};
+/* ---------- État ---------- */
+const IP={on:false,N:0,cap:0,B:0,bcap:0,t:0,h:1,run:false,done:false,shots:0,ang:0,aim:0,vk:1,proj:'p762',tgt:'torse',speed:1,layers:[],stats:null,log:[]};
+function impAlloc(n,nb){
+  IP.cap=n; IP.bcap=nb;
+  for(const k of ['x','y','vx','vy','fx','fy','m','im','T','ox','oy']) IP[k]=new Float64Array(n);
+  for(const k of ['mat','grp','al','lay','nz','br']) IP[k]=new Uint8Array(n);
+  IP.det=new Float64Array(n); IP.pin0=new Uint8Array(n); IP.pass=new Uint8Array(n); IP.vex=new Float64Array(n);
+  for(const k of ['ba','bb']) IP[k]=new Int32Array(nb); IP.bsoft=new Uint8Array(nb);
+  for(const k of ['L0','K','ey','ef','et','ec','D','P','mlt']) IP['b'+k]=new Float64Array(nb);
+  IP.bal=new Uint8Array(nb);
+}
+function impAdd(x,y,mat,grp,lay){
+  if(IP.N>=IP.cap) return -1; const i=IP.N++, M=IMAT[IMAT_K[mat]], h=IP.h, m=M.rho*h*h*h;
+  IP.x[i]=x; IP.y[i]=y; IP.ox[i]=x; IP.oy[i]=y; IP.pin0[i]=0; IP.vx[i]=0; IP.vy[i]=0; IP.m[i]=m; IP.im[i]=1/m; IP.T[i]=20; IP.mat[i]=mat; IP.grp[i]=grp; IP.al[i]=1; IP.lay[i]=lay; IP.nz[i]=(Math.random()*255)|0; IP.det[i]=-1; IP.br[i]=0;
+  return i;
+}
+function impBond(i,j,diag,sm){
+  if(i<0||j<0||IP.B>=IP.bcap) return; const b=IP.B++, A=IMAT[IMAT_K[IP.mat[i]]], C=IMAT[IMAT_K[IP.mat[j]]], h=IP.h;
+  const L=Math.hypot(IP.x[j]-IP.x[i],IP.y[j]-IP.y[i]), E=Math.min(A.Ee,C.Ee)*(A===C?1:.8), w=diag?.5:1, K=E*h*h*w, mr=IP.m[i]*IP.m[j]/(IP.m[i]+IP.m[j]);
+  IP.ba[b]=i; IP.bb[b]=j; IP.bsoft[b]=(A.soft&&C.soft)?1:0; IP.bL0[b]=L; IP.bK[b]=K; IP.bP[b]=0; IP.bal[b]=1;
+  const ey=Math.min(A.eyE,C.eyE), ef=Math.min(A.ef,C.ef), et=Math.min(A.etE,C.etE), ec=Math.min(A.ecE,C.ecE);
+  IP.bey[b]=ey*sm; IP.bef[b]=ef*sm; IP.bet[b]=et*sm; IP.bec[b]=ec*sm; IP.bmlt[b]=Math.min(A.melt,C.melt);
+  IP.bD[b]=Math.max(A.damp,C.damp)*2*Math.sqrt(K/L*mr);
+}
+/* Grille régulière + liaisons (axes et diagonales), tournée d'un angle autour d'un pivot */
+function impBlock(u0,v0,nu,nv,matF,grp,lay,rot,piv,sv,anis,pin){
+  const h=IP.h, c=Math.cos(rot), s=Math.sin(rot), id=new Int32Array(nu*nv).fill(-1); IP.Bstart=IP.B;
+  for(let a=0;a<nu;a++) for(let b=0;b<nv;b++){const u=u0+a*h, v=v0+b*h, mat=matF(u,v,a,b); if(mat<0) continue;
+    const x=piv[0]+u*c-v*s, y=piv[1]+u*s+v*c, i=impAdd(x,y,mat,grp,lay); id[a*nv+b]=i; if(pin&&(b===0||b===nv-1)&&i>=0){IP.im[i]=0; IP.pin0[i]=1;}}
+  const R=()=>1+(Math.random()-.5)*2*sv;
+  for(let a=0;a<nu;a++) for(let b=0;b<nv;b++){const i=id[a*nv+b]; if(i<0) continue; const va=IMAT[IMAT_K[IP.mat[i]]].va||0;
+    const r=()=>Math.max(.2,1+(Math.random()-.5)*2*(sv||va)), an=IMAT[IMAT_K[IP.mat[i]]].an||1;
+    if(a+1<nu) impBond(i,id[(a+1)*nv+b],0,r()*(anis?an:1));
+    if(b+1<nv) impBond(i,id[a*nv+b+1],0,r());
+    if(a+1<nu&&b+1<nv) impBond(i,id[(a+1)*nv+b+1],1,r()*(anis?Math.sqrt(an):1));
+    if(a+1<nu&&b>0) impBond(i,id[(a+1)*nv+b-1],1,r()*(anis?Math.sqrt(an):1));}
+  if(pin) for(let b=IP.Bstart||0;b<IP.B;b++) if(IP.pin0[IP.ba[b]]||IP.pin0[IP.bb[b]]){IP.bey[b]*=4; IP.bef[b]*=4; IP.bet[b]*=4; IP.bec[b]*=4;}
+  return id;
+}
+/* ---------- Construction d'une scène ---------- */
+function impProjDims(P){ if(P.heat) return {L:0,D:0}; const M=IMAT[P.core||P.case||'plomb'], D=P.D, L=P.m*1000/(M.rho*Math.PI*D*D/4)*(P.fill?1.35:1)*(P.case?1.6:1); return {L:Math.max(D*.6,L),D}; }
+function impScene(keepTarget,noShot){
+  const T=ITGT[IP.tgt], P=IPROJ[IP.proj], dims=impProjDims(P), S=T.L.reduce((a,l)=>a+l[1]+(l[3]||0),0), H=T.H, ang=(IP.ang!==null?IP.ang:(T.ang||0))*Math.PI/180;
+  const Lp=P.heat?P.heat*1.2:Math.min(dims.L,S*2.2+60), mob=matchMedia('(pointer: coarse)').matches, Nmax=IP.nmax||(mob?4200:6500);
+  if(!keepTarget||!IP.scene||IP.scene.tgt!==IP.tgt||IP.scene.ang!==ang){
+    const softT=T.L.filter(l=>IMAT[l[0]].soft).reduce((a,l)=>a+l[1],0)/S; impMatSetup(softT>.7?1.5:softT>.4?1.9:2.4);
+    // résolution : on vise Nmax particules pour la cible et le projectile
+    const area=S*H+Lp*Math.max(P.D||8,4); let h=Math.max(.4,Math.sqrt(area/Nmax),(P.D||40)/(mob?10:13),S/(mob?260:400)); h=Math.round(h*100)/100;
+    IP.h=h; impAlloc(Nmax+4000,(Nmax+4000)*4+100); IP.N=0; IP.B=0; IP.t=0; IP.shots=0;
+    const ext=Math.abs(Math.sin(ang))*H/2+S*Math.abs(Math.cos(ang));
+    const X0=Math.max(Lp,40)+30, W=X0+ext+Math.max(110,S*.9+H*.3*Math.abs(Math.sin(ang))), Hw=Math.max(H*Math.cos(ang)+S*Math.abs(Math.sin(ang)),H)+40;
+    IP.world={x0:0,y0:-Hw/2,x1:W,y1:Hw/2}; IP.scene={tgt:IP.tgt,ang,X0,S,H}; IP.layers=[];
+    let u=0, lay=0, prevId=null, prevNu=0, prevNv=0;
+    for(const [mk,th,glue,gap,label] of T.L){
+      u+=gap||0; const nu=Math.max(1,Math.round(th/h)), nv=Math.round(H/h)+1, mi=IMAT_I[mk], M=IMAT[mk];
+      const id=impBlock(u,-H/2,nu,nv,()=>mi,0,lay,ang,[X0,0],0,M.an?1:0,1);
+      if(glue&&prevId&&!gap&&prevNv===nv) for(let b=0;b<nv;b++){const i=prevId[(prevNu-1)*nv+b], j=id[b]; impBond(i,j,0,1); if(b+1<nv) impBond(i,id[b+1],1,1); if(b>0) impBond(i,id[b-1],1,1);}
+      IP.layers.push({mk,nom:label||M.nom,u0:u,u1:u+nu*h,tissu:!!M.tissu}); u+=nu*h; lay++; prevId=id; prevNu=nu; prevNv=nv;}
+    IP.tN=IP.N; IP.scene.S=u; IP.scene.u1=u; IP.slay=IP.layers.filter(l=>IMAT[l.mk].soft).map(l=>({u0:l.u0,u1:l.u1,rho:IMAT[l.mk].rho,cd:IMAT[l.mk].cd||.5,sig:IMAT[l.mk].sig||.002}));
+  } else { // on garde la cible abîmée : on retire l'ancien projectile
+    impCompact();
+  }
+  if(noShot){ IP.run=false; IP.done=false; IP.stats=null; IP.t0=IP.t; return; }
+  impShoot(P,dims);
+  { const sc=IP.scene, c=Math.cos(sc.ang), s=Math.sin(sc.ang), av=IP.aim*sc.H*.4/Math.max(.3,c), Rp=Math.min(sc.H*.46,Math.max(1.6*(P.D||0),9,(P.heat||0)*.5));
+    for(let i=0;i<IP.tN&&i<IP.N;i++){ if(IP.grp[i]!==0) continue; const v=-(IP.ox[i]-sc.X0)*s+IP.oy[i]*c, soft=MSOFT[IP.mat[i]], fib=IMAT[IMAT_K[IP.mat[i]]].an?2.6:1;
+      const R0=Math.min(sc.H*.3,Rp*fib), dd=Math.abs(v-av); let k=1;
+      if(IP.pin0[i]) k=0; else if(!soft&&dd>R0){ const q=(dd-R0)/R0; k=q>2.2?0:1/(1+40*q*q); }
+      IP.im[i]=k/IP.m[i]; if(k===0){IP.vx[i]=0; IP.vy[i]=0;} } }
+  IP.maxPen=0; IP.rico=0; IP.booms=0; IP.pend=[]; IP.tisV=-1; { const tl=IP.layers.find(l=>l.tissu); IP.tisU=tl?tl.u0:1e9; }
+  IP.done=false; IP.run=true; IP.stats=null; IP.t0=IP.t; IP.shots++;
+  const cs=IMAT_K.map(k=>Math.sqrt(IMAT[k].Ee/IMAT[k].rho)), vmax=(P.heat?8:(P.v/1000)*IP.vk)*1.1;
+  IP.dt=Math.min(.24*IP.h/Math.max(...cs),.2*IP.h/Math.max(vmax,.3));
+  IP.tEnd=IP.t+Math.min(1400,(IP.scene.S+(P.heat?300:dims.L)+120)/Math.max(.25,vmax*.55));
+}
+function impCompact(){ // supprime projectile, gaz et particules sorties ; renumérote les liaisons
+  const N=IP.N, map=new Int32Array(N).fill(-1); let n=0;
+  for(let i=0;i<N;i++) if(IP.al[i]&&IP.grp[i]===0){map[i]=n; if(n!==i) for(const k of ['x','y','vx','vy','m','im','T','ox','oy','mat','grp','al','lay','nz','det','br','pin0']) IP[k][n]=IP[k][i]; n++;}
+  IP.N=n; IP.pass.fill(0); let nb=0;
+  for(let b=0;b<IP.B;b++){ if(!IP.bal[b]) continue; const i=map[IP.ba[b]], j=map[IP.bb[b]]; if(i<0||j<0) continue; IP.ba[nb]=i; IP.bb[nb]=j; IP.bsoft[nb]=IP.bsoft[b]; for(const k of ['bL0','bK','bey','bef','bet','bec','bD','bP','bmlt']) IP[k][nb]=IP[k][b]; IP.bal[nb]=1; nb++; }
+  IP.B=nb; for(let i=0;i<n;i++){IP.vx[i]*=.0; IP.vy[i]*=.0;}
+}
+function impShoot(P,dims){
+  const h=IP.h, sc=IP.scene, aimY=IP.aim*sc.H*.4, v=(P.v||0)/1000*IP.vk, gp=1;
+  // point d'entrée sur la face avant (cible inclinée) : x du plan avant à la hauteur visée
+  const xf=sc.X0-aimY*Math.tan(sc.ang);
+  if(P.heat){ // jet de charge creuse : cuivre étiré, pointe à 7,5 km/s, queue à 2 km/s
+    const CD=P.heat, Lj=CD*1.1, w=Math.max(h,CD*.018), nj=Math.round(Lj/h), nw=Math.max(1,Math.round(w/h)), x0=xf-20-Lj, cu=IMAT_I.cuivre;
+    for(let a=0;a<nj;a++) for(let b=0;b<nw;b++){const i=impAdd(x0+a*h,aimY+(b-(nw-1)/2)*h,cu,gp,255); if(i<0) break; const t=a/(nj-1); IP.vx[i]=2+5.5*t; IP.T[i]=500;}
+    const sl=Math.round(CD*.25/h); for(let a=0;a<sl;a++) for(let b=-1;b<=1;b++){const i=impAdd(x0-CD*.3+a*h,aimY+b*h,cu,gp,255); if(i>=0) IP.vx[i]=.8;}
+    IP.pinfo={L:Lj,D:w,m:0}; return;
+  }
+  const D=P.D, L=dims.L, R=D/2, nl=Math.min(L*.6,D*(P.nose||.5)*1.2), pel=P.pellets||1;
+  for(let k=0;k<pel;k++){ const yo=pel>1?(k-(pel-1)/2)*D*1.7:0;
+    const mf=(u,v)=>{ // u : 0 (culot) → L (pointe)
+      const vv=Math.abs(v); let r=R; if(pel>1) r=Math.sqrt(Math.max(0,R*R-(u-R)*(u-R))); else if(u>L-nl){const q=(u-(L-nl))/nl; r=R*Math.sqrt(Math.max(0,1-q*q));} if(vv>r+1e-6) return -1;
+      if(P.case){ const ct=R*(P.caseT||.12)*1.6; if(vv>r-ct||u<ct||u>L-nl*.6) return IMAT_I[P.case]; return IMAT_I[P.fill]; }
+      if(P.jacket&&r-vv<Math.max(P.jacket,h*.6)&&u>h) return IMAT_I.cuivre;
+      if(P.tip&&u>L*(1-P.tipL)) return IMAT_I[P.tip];
+      if(P.coreD&&vv>R*P.coreD) return IMAT_I[P.fill||'plomb'];
+      if(P.cap&&u>L-nl*.5) return IMAT_I.acierp;
+      return IMAT_I[P.core]; };
+    const nu=Math.max(2,Math.round((pel>1?D:L)/h)), nv=Math.max(2,Math.round(D/h)+1), len=pel>1?D:L;
+    const id=impBlock(-len,-D/2,nu,nv,(u,v)=>mf(u+len,v),gp,255,0,[xf-3*h-(pel>1?k*D*1.1:0),aimY+yo],0,0,0);
+    for(const i of id) if(i>=0){IP.vx[i]=v; if(P.core==='plasma') IP.T[i]=9000;}
+  }
+  IP.pinfo={L,D,m:P.m};
+}
+/* ---------- Pas de simulation ---------- */
+const IGRID={head:null,nxt:null,nx:0,ny:0};
+function impStep(dt){
+  const N=IP.N, x=IP.x, y=IP.y, vx=IP.vx, vy=IP.vy, fx=IP.fx, fy=IP.fy, T=IP.T, m=IP.m, al=IP.al, h=IP.h;
+  fx.fill(0,0,N); fy.fill(0,0,N);
+  // 1) liaisons : élasticité, plasticité (avec échauffement), rupture
+  const SOFTB=IP.bsoft, mt=IP.mat, ba=IP.ba, bb=IP.bb, L0=IP.bL0, K=IP.bK, EY=IP.bey, EF=IP.bef, ET=IP.bet, EC=IP.bec, DM=IP.bD, PP=IP.bP, bal=IP.bal, MLT=IP.bmlt;
+  const br=IP.br, NB=IP.B;
+  for(let b=0;b<NB;b++){ if(bal[b]===0) continue; const i=ba[b], j=bb[b]; if(al[i]===0||al[j]===0){bal[b]=0; continue;}
+    const dx=x[j]-x[i], dy=y[j]-y[i], L=Math.sqrt(dx*dx+dy*dy)+1e-9, l0=L0[b]; let e=(L-l0)/l0;
+    if(e<0&&SOFTB[b]===1) continue;
+    let ey=EY[b]; const Ti=T[i], Tj=T[j];
+    if(Ti>150||Tj>150){ const ml=MLT[b], tm=(Ti+Tj)*.5; if(ml>0&&tm>ml*.45){ ey*=Math.max(.04,1-(tm-ml*.45)/(ml*.55)); if(tm>ml&&e>.6){bal[b]=0; continue;} } }
+    if(e>ET[b]||e<-EC[b]){bal[b]=0; br[i]++; br[j]++; continue;}
+    if(e>ey||e<-ey){ const sg=e>0?1:-1, dp=sg>0?e-ey:-e-ey; L0[b]=l0*(1+sg*dp); PP[b]+=dp;
+      const dT=K[b]*ey*dp*l0*5e5; T[i]=Ti+dT/(m[i]*MCP[mt[i]]); T[j]=Tj+dT/(m[j]*MCP[mt[j]]);
+      if(PP[b]>EF[b]&&!(MLT[b]>0&&(Ti+Tj)*.5>MLT[b])){bal[b]=0; br[i]++; br[j]++; continue;}
+      e=sg*ey; }
+    const nx=dx/L, ny=dy/L, F=K[b]*e+DM[b]*((vx[j]-vx[i])*nx+(vy[j]-vy[i])*ny);
+    fx[i]+=F*nx; fy[i]+=F*ny; fx[j]-=F*nx; fy[j]-=F*ny; }
+  // 2) contacts entre particules non liées (projectile/cible, fissures, éclats)
+  const w=IP.world, gx=IGRID; const nx=Math.ceil((w.x1-w.x0)/h)+2, ny=Math.ceil((w.y1-w.y0)/h)+2;
+  if(!gx.head||gx.head.length<nx*ny){gx.head=new Int32Array(nx*ny);} if(!gx.nxt||gx.nxt.length<IP.cap) gx.nxt=new Int32Array(IP.cap);
+  const head=gx.head, nxt=gx.nxt; head.fill(-1,0,nx*ny); const ih=1/h;
+  for(let i=0;i<N;i++){ if(!al[i]) continue; const cx=((x[i]-w.x0)*ih)|0, cy=((y[i]-w.y0)*ih)|0; if(cx<0||cy<0||cx>=nx||cy>=ny){al[i]=0; continue;} const c=cy*nx+cx; nxt[i]=head[c]; head[c]=i; }
+  const rc=h*.9, rc2=rc*rc, kh=.35*h;
+  const pv=IP.pvel||[1,0,0], grp=IP.grp;
+  const flow=(p,s2)=>{ // p : particule du projectile, s2 : particule de chair
+    const sp=pv[2]; if(sp<.02) return; const dx=x[s2]-x[p], dy=y[s2]-y[p], ux=pv[0], uy=pv[1], al2=dx*ux+dy*uy; let rx=dx-al2*ux, ry=dy-al2*uy, rl=Math.hypot(rx,ry);
+    if(rl<1e-4){rx=-uy*(IP.nz[s2]>127?1:-1); ry=ux*(IP.nz[s2]>127?1:-1); rl=1;} const k=.18;
+    const tvx=(rx/rl)*sp*.42+ux*sp*.35, tvy=(ry/rl)*sp*.42+uy*sp*.35; vx[s2]+=(tvx-vx[s2])*k; vy[s2]+=(tvy-vy[s2])*k; };
+  const pair=(i,j)=>{ const dx=x[j]-x[i], dy=y[j]-y[i], d2=dx*dx+dy*dy; if(d2>=rc2*2.2||d2<1e-12) return; const mi=mt[i], mj=mt[j];
+    if(grp[i]===1&&MSOFT[mj]&&grp[j]===0){ flow(i,j); return; } if(grp[j]===1&&MSOFT[mi]&&grp[i]===0){ flow(j,i); return; }
+    if(d2>=rc2) return; const d=Math.sqrt(d2), ov=rc-d;
+    const kc=(MEE[mi]+MEE[mj])*kh, nx2=dx/d, ny2=dy/d, vr=(vx[j]-vx[i])*nx2+(vy[j]-vy[i])*ny2; let F=kc*ov;
+    if(vr<0){ const mr=m[i]*m[j]/(m[i]+m[j]); F-=.2*Math.sqrt(kc*mr)*vr; }
+    fx[i]-=F*nx2; fy[i]-=F*ny2; fx[j]+=F*nx2; fy[j]+=F*ny2;
+    if(MHOT[mi]|MHOT[mj]|MEX[mi]|MEX[mj]){ if(MHOT[mi]&&!MHOT[mj]) T[j]=Math.min(6000,T[j]+60); else if(MHOT[mj]&&!MHOT[mi]) T[i]=Math.min(6000,T[i]+60);
+      if(MEX[mi]&&IP.det[i]<0&&-vr>.35) impDetonate(i); if(MEX[mj]&&IP.det[j]<0&&-vr>.35) impDetonate(j); } };
+  for(let cy=0;cy<ny;cy++){ const r0=cy*nx, r1=r0+nx; for(let cx=0;cx<nx;cx++){ for(let i=head[r0+cx];i>=0;i=nxt[i]){
+      for(let j=nxt[i];j>=0;j=nxt[j]) pair(i,j);
+      if(cx+1<nx) for(let j=head[r0+cx+1];j>=0;j=nxt[j]) pair(i,j);
+      if(cy+1<ny){ for(let j=head[r1+cx];j>=0;j=nxt[j]) pair(i,j); if(cx+1<nx) for(let j=head[r1+cx+1];j>=0;j=nxt[j]) pair(i,j); if(cx>0) for(let j=head[r1+cx-1];j>=0;j=nxt[j]) pair(i,j); } } } }
+  // 2b) traînée dans les tissus mous : F = ½ρCd v² + résistance du tissu
+  if(IP.slay){ const sc=IP.scene, c=Math.cos(sc.ang), s=Math.sin(sc.ang), Lp=Math.max(2*h,IP.pinfo.L||h), lay=IP.slay; let svx=0, svy=0, sn=0;
+    for(let i=IP.tN;i<N;i++){ if(!al[i]||grp[i]!==1) continue; svx+=vx[i]; svy+=vy[i]; sn++;
+      const u=(x[i]-sc.X0)*c+y[i]*s, v=-(x[i]-sc.X0)*s+y[i]*c; if(v<-sc.H/2||v>sc.H/2) continue;
+      for(const L of lay){ if(u<L.u0||u>L.u1) continue; const spd=Math.hypot(vx[i],vy[i]); if(spd<1e-4) break;
+        const le=IP.br[i]>2?2*h:Lp, a=(.5*L.rho*L.cd*spd*spd+L.sig)/(MRHO[mt[i]]*le), dv=Math.min(spd,a*dt); vx[i]-=vx[i]/spd*dv; vy[i]-=vy[i]/spd*dv; break; } }
+    if(sn){ const sp=Math.hypot(svx,svy)/sn; IP.pvel=[svx/sn/(sp||1),svy/sn/(sp||1),sp]; } }
+  // 3) intégration
+  const im=IP.im;
+  for(let i=0;i<N;i++){ if(!al[i]||im[i]===0) continue; vx[i]+=fx[i]*im[i]*dt; vy[i]+=fy[i]*im[i]*dt; x[i]+=vx[i]*dt; y[i]+=vy[i]*dt; }
+  if((IP.k=(IP.k||0)+1)%3===0){ const sc=IP.scene, c=Math.cos(sc.ang), s=Math.sin(sc.ang);
+    for(let i=IP.tN;i<N;i++){ if(grp[i]!==1) continue; if(al[i]){ const u=(x[i]-sc.X0)*c+y[i]*s; if(u>IP.maxPen) IP.maxPen=u; if(u>sc.S+h){IP.pass[i]=1; IP.vex[i]=Math.hypot(vx[i],vy[i]);} if(IP.tisV<0&&u>IP.tisU+h) IP.tisV=Math.hypot(vx[i],vy[i]); } } }
+  // 4) explosions programmées (détonation qui se propage)
+  if(IP.pend&&IP.pend.length){ const keep=[]; for(const q of IP.pend){ if(q.t<=IP.t) impBlast(q); else keep.push(q);} IP.pend=keep; }
+  IP.t+=dt;
+}
+function impDetonate(i){ // amorçage : la charge entière détone depuis ce point (vitesse de détonation ~7 km/s)
+  const L=IP.lay[i], g=IP.grp[i], x0=IP.x[i], y0=IP.y[i]; IP.pend=IP.pend||[]; let n=0, cx=0, cy=0;
+  for(let j=0;j<IP.N;j++) if(IP.al[j]&&IMAT[IMAT_K[IP.mat[j]]].ex&&IP.det[j]<0&&IP.lay[j]===L&&IP.grp[j]===g){ const d=Math.hypot(IP.x[j]-x0,IP.y[j]-y0); IP.det[j]=IP.t+d/7; n++; cx+=IP.x[j]; cy+=IP.y[j]; }
+  if(!n) return; IP.pend.push({t:IP.t+.2,x:x0,y:y0,lay:L,grp:g,cx:cx/n,cy:cy/n,n}); IP.booms=(IP.booms||0)+1; try{sfx('boom',.5);}catch(_){}
+}
+function impBlast(q){ // la charge se transforme en gaz chauds qui poussent tout autour
+  const h=IP.h, mass=q.n*1.7*h*h*h, R=Math.max(12*h,Math.sqrt(q.n)*h*3), V=2.2;
+  for(let j=0;j<IP.N;j++){ if(!IP.al[j]) continue; const ex=IMAT[IMAT_K[IP.mat[j]]].ex&&IP.lay[j]===q.lay&&IP.grp[j]===q.grp;
+    if(ex){ const dx=IP.x[j]-q.cx, dy=IP.y[j]-q.cy, d=Math.hypot(dx,dy)||1; IP.vx[j]+=dx/d*V*1.5+(Math.random()-.5); IP.vy[j]+=dy/d*V*1.5+(Math.random()-.5); IP.T[j]=3000; IP.grp[j]=2; IP.im[j]=IP.im[j]||1; continue; }
+    // pour une couche mince (réactif), poussée surtout depuis le point d'amorçage ; sinon depuis le centre de la charge
+    const ox=q.n<300?q.x:q.cx, oy=q.n<300?q.y:q.cy, dx=IP.x[j]-ox, dy=IP.y[j]-oy, d=Math.hypot(dx,dy); if(d>R) continue;
+    if(IP.im[j]===0) continue; const k=V*Math.min(1,Math.sqrt(mass/(IP.m[j]*40)))*(1-d/R)**1.5; IP.vx[j]+=dx/(d||1)*k; IP.vy[j]+=dy/(d||1)*k; IP.T[j]+=k*400; }
+  for(let b=0;b<IP.B;b++) if(IP.bal[b]&&(IP.grp[IP.ba[b]]===2||IP.grp[IP.bb[b]]===2)) IP.bal[b]=0;
+}
+/* ---------- Bilan ---------- */
+function impStats(){
+  const sc=IP.scene, c=Math.cos(sc.ang), s=Math.sin(sc.ang), N=IP.N, h=IP.h, uOf=i=>(IP.x[i]-sc.X0)*c+IP.y[i]*s;
+  let pen=0, nOut=0, vOut=0, nP=0,  vxS=0, vyS=0, mx=0, spall=0, spM=0, pin=0;
+  for(let i=0;i<N;i++){ if(!IP.al[i]&&IP.grp[i]!==1) continue; const g=IP.grp[i];
+    if(IP.T[i]>mx&&IMAT_K[IP.mat[i]]!=='plasma'&&g!==2) mx=IP.T[i];
+    if(g===1){ nP++; if(IP.pass[i]){nOut++; vOut+=IP.al[i]?Math.hypot(IP.vx[i],IP.vy[i]):IP.vex[i];} if(!IP.al[i]) continue; const u=uOf(i); vxS+=IP.vx[i]; vyS+=IP.vy[i]; if(u>pen) pen=u; }
+    else if(g===0&&IP.al[i]){ const u=uOf(i); if(u>sc.S+Math.max(2*h,1.5)&&IP.br[i]>0&&Math.hypot(IP.vx[i],IP.vy[i])>.05){spall++; spM+=IP.m[i];} } }
+  pen=Math.max(pen,IP.maxPen||0); const vo=nOut?vOut/nOut:0, perfo=nOut>Math.max(2,nP*.08)&&vo>.06, dirx=nP?vxS/nP:0, rico=!perfo&&nP&&dirx<-.02;
+  // dégâts aux couches (organes)
+  const L=IP.layers.map(l=>({nom:l.nom,tissu:l.tissu,hit:0,n:0,cav:0}));
+  for(let i=0;i<IP.tN&&i<N;i++){ if(IP.grp[i]!==0) continue; const l=L[IP.lay[i]]; if(!l) continue; l.n++; const dd=Math.hypot(IP.x[i]-IP.ox[i],IP.y[i]-IP.oy[i]); if(!IP.al[i]||IP.br[i]>=3) {l.hit++; if(l.tissu) l.cav++;} else if(dd>Math.max(4*h,5)&&l.tissu) l.bl=(l.bl||0)+1; }
+  const reach=Math.max(pen,IP.maxPen||0); IP.layers.forEach((l,k)=>{ if(reach>l.u0+h) L[k].hit+=99; });
+  const touched=L.filter(l=>l.hit>Math.max(3,l.n*.01)).map(l=>l.nom), cav=L.reduce((a,l)=>a+l.cav,0)*h*h;
+  return {tisV:IP.tisV,bl:L.reduce((a,l)=>a+(l.bl||0),0),pen:Math.max(0,pen),perfo,rico,vOut:nOut?vOut/nOut*1000:0,ratio:nP?nOut/nP:0,spall,spM,maxT:mx,touched:[...new Set(touched)],cav,booms:IP.booms||0,S:sc.S};
+}
+function impVerdict(st){
+  const body=IP.layers.some(l=>l.tissu), P=IPROJ[IP.proj]; let t, k;
+  if(st.rico){t='RICOCHET'; k='steel';} else if(st.perfo){t='PERFORÉ'; k='bad';} else {t=st.pen>=st.S-.5?'ARRÊTÉ DE JUSTESSE':'ARRÊTÉ'; k='ok';}
+  if(body){ const vital=st.touched.some(n=>/Cœur|Cerveau/.test(n)), grave=st.touched.some(n=>/Poumon|Fémur|Crâne|Côte/.test(n)), tissue=st.touched.some(n=>/Muscle|Graisse|Peau|Cuir/.test(n));
+    const blunt=!st.touched.some(n=>!/Kevlar|Céramique|Fibres|Acier|Titane|Casque/.test(n))&&IP.layers.some(l=>l.tissu);
+    if(st.tisV>=0&&st.tisV<.08&&IP.layers.some(l=>!l.tissu)){t='ARRÊTÉ · CONTUSION'; k='mid'; return [t,k];}
+    if(vital){t='BLESSURE MORTELLE'; k='bad';} else if(grave){t='BLESSURE GRAVE'; k='bad';} else if(tissue){t=st.perfo?'TRANSFIXIANT':'BLESSURE LÉGÈRE'; k='mid';} else {t=blunt&&st.bl>20?'PROTÉGÉ · CONTUSION':'PROTÉGÉ'; k='ok';} }
+  return [t,k];
+}
+/* ---------- Rendu : image en pixels (1 particule ≈ 2×2 px), puis agrandie sans lissage ---------- */
+const ICOL=IMAT_K.map(k=>{const n=parseInt(IMAT[k].col.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255];});
+function impHeat(T,c){ if(T<420) return c; const k=Math.min(1,(T-420)/1100), r=Math.min(255,c[0]*(1-k)+255*Math.min(1,k*1.6)), g=Math.min(255,c[1]*(1-k)+255*Math.max(0,k*1.4-.45)), b=Math.min(255,c[2]*(1-k)+255*Math.max(0,k*2-1.4)); return [r,g,b]; }
+function impDraw(){
+  const cv=IP.cv, ctx=cv.getContext('2d'), w=IP.world, h=IP.h, S=2/h, gw=Math.ceil((w.x1-w.x0)*S), gh=Math.ceil((w.y1-w.y0)*S);
+  if(!IP.img||IP.img.width!==gw||IP.img.height!==gh){IP.img=new ImageData(gw,gh); IP.off=document.createElement('canvas'); IP.off.width=gw; IP.off.height=gh; IP.u32=new Uint32Array(IP.img.data.buffer);}
+  const u=IP.u32, bg=0xff120f0c; u.fill(bg);
+  // quadrillage millimétrique discret
+  const step=Math.max(1,Math.round(10/h))*2; for(let yy=0;yy<gh;yy+=step) for(let xx=0;xx<gw;xx++) u[yy*gw+xx]=0xff1b1814; for(let xx=0;xx<gw;xx+=step) for(let yy=0;yy<gh;yy++) u[yy*gw+xx]=0xff1b1814;
+  const N=IP.N, x=IP.x, y=IP.y, rot=Math.abs(IP.scene.ang)>.01;
+  for(let i=0;i<N;i++){ if(!IP.al[i]) continue; const g=IP.grp[i]; let c=ICOL[IP.mat[i]];
+    const nz=(IP.nz[i]/255-.5)*.16, br=IP.br[i], dmg=Math.min(.45,br*.06); let r=c[0]*(1+nz-dmg), gg=c[1]*(1+nz-dmg), bb=c[2]*(1+nz-dmg);
+    if(g===2){ const T=IP.T[i]; r=255; gg=150+Math.min(105,T/30); bb=60; }
+    else if(IP.T[i]>420){ const q=impHeat(IP.T[i],[r,gg,bb]); r=q[0]; gg=q[1]; bb=q[2]; }
+    const tis=IMAT[IMAT_K[IP.mat[i]]].tissu; if(tis&&br>1&&g===0){ r=r*.75+120*.25; gg*=.55; bb*=.55; }
+    const col=0xff000000|(Math.max(0,Math.min(255,bb))<<16)|(Math.max(0,Math.min(255,gg))<<8)|Math.max(0,Math.min(255,r));
+    const px=((x[i]-w.x0)*S)|0, py=((y[i]-w.y0)*S)|0, sp=Math.hypot(IP.vx[i],IP.vy[i]), big=rot||br>0||g!==0;
+    if(px<1||py<1||px>=gw-2||py>=gh-2) continue;
+    const o=py*gw+px; u[o]=col; u[o+1]=col; u[o+gw]=col; u[o+gw+1]=col; if(big){u[o-1]=col; u[o-gw]=col;}
+    if(sp>.25&&g!==0){ const k=Math.min(6,sp*3), dx=-IP.vx[i]/sp, dy=-IP.vy[i]/sp; for(let s2=1;s2<=k;s2++){const qx=(px+dx*s2*1.5)|0, qy=(py+dy*s2*1.5)|0; if(qx>0&&qy>0&&qx<gw&&qy<gh) u[qy*gw+qx]=col;} } }
+  IP.off.getContext('2d').putImageData(IP.img,0,0);
+  const W=cv.width, H=cv.height, sx=W/gw, sy=H/gh, s=Math.min(sx,sy)*.94*(IP.zoom||1), ox=(W-gw*s)/2+(IP.panX||0), oy=(H-gh*s)/2+(IP.panY||0);
+  ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle='#0c0a08'; ctx.fillRect(0,0,W,H); ctx.imageSmoothingEnabled=false; ctx.drawImage(IP.off,ox,oy,gw*s,gh*s);
+  IP.view={ox,oy,s:s*S,w0:w.x0,h0:w.y0};
+  // repères : noms des couches, échelle, temps
+  const dpr=IP.dpr, toS=(X,Y)=>[ox+(X-w.x0)*S*s,oy+(Y-w.y0)*S*s], sc=IP.scene, c=Math.cos(sc.ang), sn=Math.sin(sc.ang);
+  ctx.font=`600 ${11*dpr}px "IBM Plex Mono",monospace`; ctx.textAlign='left'; ctx.textBaseline='bottom';
+  let lastX=-1e9; IP.layers.forEach(l=>{ const um=(l.u0+l.u1)/2, X=sc.X0+um*c-(-sc.H/2)*sn, Y=um*sn+(-sc.H/2)*c, [px,py]=toS(X,Y); if(px-lastX<14*dpr) return; lastX=px;
+    ctx.save(); ctx.translate(px,py-6*dpr); ctx.rotate(-Math.PI/2.6); ctx.fillStyle='rgba(232,236,240,.85)'; ctx.fillText(`${l.nom} ${fmt1(l.u1-l.u0)} mm`,0,0); ctx.restore(); });
+  const mm=[1,2,5,10,20,50,100,200,500].find(v=>v*S*s>70*dpr)||1000, [bx,by]=[16*dpr,H-18*dpr];
+  ctx.strokeStyle='#e8ecf0'; ctx.lineWidth=2*dpr; ctx.beginPath(); ctx.moveTo(bx,by); ctx.lineTo(bx+mm*S*s,by); ctx.stroke(); ctx.fillStyle='#e8ecf0'; ctx.textBaseline='bottom'; ctx.fillText(`${mm} mm`,bx,by-4*dpr);
+  ctx.textAlign='right'; ctx.fillText(`t = ${fmt1(IP.t-(IP.t0||0))} µs`+(IP.run&&IP.slow?` · ralenti ×${IP.slow.toLocaleString('fr-FR')}`:''),W-16*dpr,H-14*dpr);
+  if(!IP.run&&!IP.done){ const aimY=IP.aim*sc.H*.4, xf=sc.X0-aimY*Math.tan(sc.ang), [ax,ay]=toS(0,aimY), [fx2]=toS(xf,aimY); ctx.setLineDash([6*dpr,6*dpr]); ctx.strokeStyle='rgba(255,90,70,.7)'; ctx.lineWidth=1.5*dpr; ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(fx2,ay); ctx.stroke(); ctx.setLineDash([]); }
+}
+
+/* ---------- Boucle ---------- */
+function impLoop(){
+  if(!IP.on) return; const t0=performance.now(), budget=(matchMedia('(pointer: coarse)').matches?9:12)*(IP.fast||1);
+  if(IP.run&&!IP.done){ let n=0; const target=(IP.fast||1)>1?1e9:1.2; let simT=0;
+    while(performance.now()-t0<budget&&simT<target){ impStep(IP.dt); simT+=IP.dt; n++; }
+    IP.slow=simT>0?Math.round(16700/simT/100)*100:0; // facteur de ralenti
+    if(IP.t>=IP.tEnd||(IP.t-IP.t0>12&&(IP.qk=(IP.qk||0)+1)%10===0&&impQuiet())){ IP.done=true; IP.run=false; IP.stats=impStats(); impShowRes(); } }
+  impDraw(); IP.raf=requestAnimationFrame(impLoop);
+}
+function impQuiet(){ // tout est presque immobile : fin du calcul
+  let fast=0; for(let i=0;i<IP.N;i++) if(IP.al[i]&&(IP.vx[i]*IP.vx[i]+IP.vy[i]*IP.vy[i])>.0016) {fast++; if(fast>8) return false;} return true; }
+/* ---------- Interface du labo ---------- */
+const IMP_CSS=`
+#imp{position:fixed;inset:0;z-index:60;background:#0b0907;display:grid;grid-template-columns:minmax(0,1fr) 340px;grid-template-rows:auto minmax(0,1fr);color:#e8ecf0;font-family:var(--f-ui)}
+#imp[hidden]{display:none}
+.imp-top{grid-column:1/-1;display:flex;align-items:center;gap:14px;padding:max(10px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left));border-bottom:1px solid var(--line);background:rgba(16,13,10,.9)}
+.imp-top h2{margin:0;font:700 20px/1 var(--f-display);letter-spacing:.06em;text-transform:uppercase} .imp-top h2 span{color:var(--hazard)}
+.imp-top small{color:var(--muted);font-size:12.5px} .imp-top button{margin-left:auto}
+#imp button{font:inherit;color:inherit;cursor:pointer}
+.imp-btn{background:var(--glass);border:1px solid var(--line);border-radius:11px;padding:8px 13px;font-size:13px!important}
+.imp-stage{position:relative;min-height:0;overflow:hidden;touch-action:none}
+#imp-cv{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
+.imp-zoom{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:6px} .imp-zoom button{width:38px;height:38px;border-radius:10px;background:var(--glass);border:1px solid var(--line);font-size:18px!important}
+.imp-res{position:absolute;left:14px;top:14px;max-width:min(360px,calc(100% - 80px));background:rgba(14,12,10,.9);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:grid;gap:6px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.imp-res[hidden]{display:none} .imp-res{cursor:pointer} .imp-res.mini dl{display:none} .imp-res .tip{font-size:10.5px;color:var(--muted)}
+.imp-res .v{font:700 22px/1 var(--f-display);letter-spacing:.05em} .imp-res .v.bad{color:#ff6a5c} .imp-res .v.ok{color:#63c58f} .imp-res .v.mid{color:#ffb52e} .imp-res .v.steel{color:#a9bccd}
+.imp-res dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12.5px} .imp-res dt{color:var(--muted)} .imp-res dd{margin:0;font-family:var(--f-mono);font-size:12px}
+.imp-side{border-left:1px solid var(--line);background:rgba(14,12,10,.95);overflow:auto;padding:14px 16px max(16px,env(safe-area-inset-bottom));display:grid;gap:16px;align-content:start}
+.imp-side h3{margin:0 0 6px;font:600 11px/1 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--hazard)}
+.imp-side select{width:100%;background:#16130f;color:#e8ecf0;border:1px solid var(--line);border-radius:10px;padding:9px 10px;font:500 14px var(--f-ui)}
+.imp-meta{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.4}
+.imp-lay{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px} .imp-lay span{font-size:11px;padding:3px 7px;border-radius:7px;background:rgba(255,255,255,.05);display:inline-flex;gap:5px;align-items:center} .imp-lay i{width:9px;height:9px;border-radius:2px;display:inline-block}
+.imp-rng{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;font-size:12.5px;margin-top:8px} .imp-rng input{grid-column:1/-1;width:100%;accent-color:var(--hazard)} .imp-rng b{font-family:var(--f-mono);font-size:12px;font-weight:500}
+.imp-fire{width:100%;padding:13px!important;border-radius:13px!important;border:0!important;background:linear-gradient(140deg,#ff8a6e,#ff4b3a 60%,#d8261c)!important;color:#fff!important;font:700 17px/1 var(--f-display)!important;letter-spacing:.14em;text-transform:uppercase;box-shadow:0 8px 24px rgba(255,70,50,.28)}
+.imp-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px} .imp-row .imp-btn{flex:1}
+.imp-seg{display:flex;gap:4px;margin-top:8px} .imp-seg button{flex:1;padding:7px;border-radius:9px;border:1px solid var(--line);background:transparent;font-size:12px!important} .imp-seg button[aria-pressed=true]{border-color:var(--hazard);color:var(--hazard)}
+.imp-note{font-size:11.5px;color:var(--muted);line-height:1.45}
+@media (max-width:820px),(max-height:520px) and (orientation:landscape){
+  #imp{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto}
+  .imp-side{border-left:0;border-top:1px solid var(--line);max-height:44vh;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .imp-top small{display:none} .imp-res{top:auto;bottom:8px;left:8px;padding:7px 10px;max-width:min(300px,62%);gap:4px} .imp-res .v{font-size:16px} .imp-res dl{font-size:11px} .imp-res dd{font-size:10.5px}
+}
+@media (orientation:landscape) and (max-height:520px){ #imp{grid-template-columns:minmax(0,1fr) 300px;grid-template-rows:auto minmax(0,1fr)} .imp-side{max-height:none;border-top:0;border-left:1px solid var(--line);grid-template-columns:1fr} }
+`;
+function impUI(){
+  if(IP.ui) return; const st=document.createElement('style'); st.textContent=IMP_CSS; document.head.appendChild(st);
+  const d=document.createElement('div'); d.id='imp'; d.hidden=true; d.setAttribute('role','dialog'); d.setAttribute('aria-label','Labo d’impact');
+  const grpSel=(obj)=>{const g={}; for(const [k,v] of Object.entries(obj)) (g[v.cat]=g[v.cat]||[]).push([k,v.nom]); return Object.entries(g).map(([c,l])=>`<optgroup label="${esc(c)}">${l.map(([k,n])=>`<option value="${k}">${esc(n)}</option>`).join('')}</optgroup>`).join('');};
+  d.innerHTML=`<header class="imp-top"><h2>Labo <span>d’impact</span></h2><small>Vue en coupe · chaque grain de matière est simulé (rigidité, plasticité, rupture, chaleur)</small><button class="imp-btn" id="imp-close">Fermer <kbd>Échap</kbd></button></header>
+  <div class="imp-stage"><canvas id="imp-cv"></canvas><section class="imp-res" id="imp-res" hidden aria-live="polite"></section>
+    <div class="imp-zoom"><button id="imp-zin" aria-label="Zoomer">+</button><button id="imp-zout" aria-label="Dézoomer">−</button><button id="imp-z0" aria-label="Recadrer" style="font-size:13px!important">⤢</button></div></div>
+  <aside class="imp-side">
+    <section><h3>Projectile</h3><select id="imp-proj">${grpSel(IPROJ)}</select><div class="imp-meta" id="imp-pmeta"></div></section>
+    <section><h3>Cible</h3><select id="imp-tgt">${grpSel(ITGT)}</select><div class="imp-lay" id="imp-lay"></div></section>
+    <section><h3>Tir</h3>
+      <div class="imp-rng"><span>Angle de la cible</span><b id="imp-angv"></b><input type="range" id="imp-ang" min="0" max="75" step="5"></div>
+      <div class="imp-rng"><span>Vitesse du projectile</span><b id="imp-vkv"></b><input type="range" id="imp-vk" min="40" max="140" step="5"></div>
+      <div class="imp-rng"><span>Hauteur du point d’impact</span><b id="imp-aimv"></b><input type="range" id="imp-aim" min="-100" max="100" step="5"></div>
+      <div class="imp-row" style="margin-top:12px"><button class="imp-fire" id="imp-fire">Tirer</button></div>
+      <div class="imp-row"><button class="imp-btn" id="imp-new">Cible neuve</button><button class="imp-btn" id="imp-play">Pause</button></div>
+      <div class="imp-seg" role="group" aria-label="Vitesse d’animation"><button data-sp="1" aria-pressed="true">Ralenti fluide</button><button data-sp="4" aria-pressed="false">Rapide</button></div>
+      <p class="imp-note">Tirez plusieurs fois : la cible garde ses dégâts. Touchez la cible pour choisir où frapper. Les tissus du corps sont traités comme un liquide visqueux ; le reste est un réseau de grains qui plient puis cassent.</p></section>
+  </aside>`;
+  document.getElementById('app').appendChild(d); IP.ui=d; IP.cv=d.querySelector('#imp-cv'); IP.zoom=1; IP.panX=0; IP.panY=0;
+  const q=id=>d.querySelector('#'+id);
+  q('imp-close').onclick=()=>impClose();
+  q('imp-res').onclick=()=>q('imp-res').classList.toggle('mini');
+  q('imp-proj').onchange=e=>{IP.proj=e.target.value; impSync(); if(!IP.run) impScene(false,true);};
+  q('imp-tgt').onchange=e=>{IP.tgt=e.target.value; IP.ang=ITGT[IP.tgt].ang||0; q('imp-ang').value=IP.ang; impSync(); impScene(false,true); impFit();};
+  q('imp-ang').oninput=e=>{IP.ang=+e.target.value; impSync(); impScene(false,true);};
+  q('imp-vk').oninput=e=>{IP.vk=e.target.value/100; impSync();};
+  q('imp-aim').oninput=e=>{IP.aim=e.target.value/100; impSync();};
+  q('imp-fire').onclick=()=>impFire();
+  q('imp-new').onclick=()=>{impScene(false,true); q('imp-res').hidden=true;};
+  q('imp-play').onclick=()=>{ if(IP.done) return; IP.run=!IP.run; impSync(); };
+  d.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{IP.fast=+b.dataset.sp; d.querySelectorAll('[data-sp]').forEach(x=>x.setAttribute('aria-pressed',x===b));});
+  q('imp-zin').onclick=()=>{IP.zoom=Math.min(8,IP.zoom*1.4);}; q('imp-zout').onclick=()=>{IP.zoom=Math.max(.6,IP.zoom/1.4);}; q('imp-z0').onclick=()=>impFit();
+  // toucher la cible : choisir la hauteur d'impact ; glisser : déplacer la vue ; molette : zoom
+  let drag=null; const cv=IP.cv;
+  cv.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,px:IP.panX,py:IP.panY,moved:false}; try{cv.setPointerCapture(e.pointerId);}catch(_){}});
+  cv.addEventListener('pointermove',e=>{ if(!drag) return; const dx=e.clientX-drag.x, dy=e.clientY-drag.y; if(Math.hypot(dx,dy)>6) drag.moved=true; if(drag.moved){ IP.panX=drag.px+dx*IP.dpr; IP.panY=drag.py+dy*IP.dpr; } });
+  cv.addEventListener('pointerup',e=>{ if(drag&&!drag.moved&&IP.view&&IP.scene){ const r=cv.getBoundingClientRect(), X=(e.clientX-r.left)*IP.dpr, Y=(e.clientY-r.top)*IP.dpr, wy=(Y-IP.view.oy)/IP.view.s+IP.view.h0, sc=IP.scene;
+      const a=clamp(wy*Math.cos(sc.ang)/(sc.H*.4),-1,1); IP.aim=Math.round(a*20)/20; q('imp-aim').value=Math.round(IP.aim*100); impSync(); } drag=null; });
+  cv.addEventListener('wheel',e=>{e.preventDefault(); IP.zoom=clamp(IP.zoom*(e.deltaY<0?1.15:1/1.15),.6,8);},{passive:false});
+  addEventListener('resize',()=>{if(IP.on) impSize();});
+}
+function impFit(){IP.zoom=1; IP.panX=0; IP.panY=0;}
+function impSize(){ const cv=IP.cv, r=cv.getBoundingClientRect(); IP.dpr=Math.min(2,devicePixelRatio||1); cv.width=Math.max(2,r.width*IP.dpr|0); cv.height=Math.max(2,r.height*IP.dpr|0); }
+function impSync(){
+  const d=IP.ui, q=id=>d.querySelector('#'+id), P=IPROJ[IP.proj], T=ITGT[IP.tgt];
+  q('imp-proj').value=IP.proj; q('imp-tgt').value=IP.tgt; q('imp-ang').value=IP.ang; q('imp-vk').value=Math.round(IP.vk*100); q('imp-aim').value=Math.round(IP.aim*100);
+  const dims=impProjDims(P); q('imp-pmeta').textContent=P.heat?`Jet de cuivre jusqu’à 7 500 m/s · charge de ${P.heat} mm`:`${Math.round(P.v*IP.vk)} m/s · ${P.m>=1000?fmt1(P.m/1000)+' kg':fmt1(P.m)+' g'} · Ø ${fmt1(P.D)} mm · ${fmt1(.5*P.m/1000*(P.v*IP.vk)**2)} J`;
+  q('imp-lay').innerHTML=T.L.map(l=>`<span><i style="background:${IMAT[l[0]].col}"></i>${esc(l[4]||IMAT[l[0]].nom)} ${fmt1(l[1])} mm</span>`).join('');
+  q('imp-angv').textContent=IP.ang+'°'; q('imp-vkv').textContent=Math.round(IP.vk*100)+' %'; q('imp-aimv').textContent=IP.aim===0?'centre':(IP.aim>0?'bas ':'haut ')+Math.abs(Math.round(IP.aim*100))+' %';
+  q('imp-play').textContent=IP.run?'Pause':'Reprendre'; q('imp-play').disabled=IP.done||(!IP.run&&!IP.stats&&!IP.shots);
+}
+function impFire(){
+  if(IP.run) return; const sc=IP.scene, ang=IP.ang*Math.PI/180;
+  const keep=!!(sc&&sc.tgt===IP.tgt&&Math.abs(sc.ang-ang)<1e-6);
+  impScene(keep); IP.ui.querySelector('#imp-res').hidden=true; impSync(); try{sfx(IPROJ[IP.proj].D>30||IPROJ[IP.proj].heat?'lourd':'tir');}catch(_){}
+}
+function impShowRes(){
+  const st=IP.stats, el=IP.ui.querySelector('#imp-res'); if(!st){el.hidden=true; return;} const [v,k]=impVerdict(st), body=IP.layers.some(l=>l.tissu);
+  const rows=[['Pénétration',st.perfo?`traversé (${fmt1(st.S)} mm)`:`${fmt1(Math.min(st.pen,st.S))} mm sur ${fmt1(st.S)} mm`+(st.pen>=st.S-.5?' · jusqu’à la face arrière':'')]];
+  if(st.perfo) rows.push(['Vitesse en sortie',`${Math.round(st.vOut)} m/s`]);
+  rows.push(['Éclats projetés à l’arrière',st.spall?`${st.spall} grains · ${fmt1(st.spM/1000)} g`:'aucun']);
+  rows.push(['Température maximale',`${Math.round(st.maxT)} °C`+(st.maxT>1300?' · métal en fusion':st.maxT>600?' · incandescent':'')]);
+  if(st.booms) rows.push(['Explosion',st.booms>1?`${st.booms} charges`:'charge amorcée']);
+  if(body){ rows.push(['Touché',st.tisV>=0&&st.tisV<.08?'choc à travers la protection (hématome)':st.touched.filter(n=>IP.layers.some(l=>l.nom===n&&l.tissu)).join(', ')||'rien']); if(st.cav) rows.push(['Tissus détruits (coupe)',`${fmt1(st.cav/100)} cm²`]); }
+  else rows.push(['Couches atteintes',st.touched.join(', ')||'aucune']);
+  el.innerHTML=`<div class="v ${k}">${v}</div><dl>${rows.map(([a,b])=>`<dt>${esc(a)}</dt><dd>${esc(b)}</dd>`).join('')}</dl><div class="tip">Touchez pour réduire</div>`; el.classList.remove('mini'); el.hidden=false; impSync();
+}
+function impProjFor(w){
+  if(!w) return 'p762'; const c=(w.cal||'')+' '+(w.nom||''), k=w.kind;
+  if(k==='roquette') return 'heat'; if(k==='obus20') return 'he20'; if(k==='rail') return 'rail'; if(k==='plasma') return 'plasma';
+  if(/9×19/.test(c)) return 'p9'; if(/\.45/.test(c)) return 'p45'; if(/\.44|\.50 AE|357/.test(c)) return 'p44'; if(/5,56/.test(c)) return 'p556';
+  if(/7,62×51|perforant|AP/.test(c)) return 'p762ap'; if(/7,62|7,92|\.30/.test(c)) return 'p762'; if(/338|Lapua|8,6/.test(c)) return 'p338';
+  if(/12,7|\.50 BMG|14,5/.test(c)) return 'p50'; if(/Cal\. ?12|12 ?ga|calibre 12/i.test(c)) return w.plombs>1?'buck':'slug'; if(/20 mm|30 mm/.test(c)) return 'he20';
+  return (w.E||0)>8000?'p50':(w.E||0)>2500?'p762':'p9';
+}
+function impTgtFor(part,mat){
+  const base=part==='tete'?'tete':part&&/bras|jambe/.test(part)?'cuisse':'torse';
+  if(!mat) return base; if(base==='tete') return 'tete_casque';
+  if(base==='torse') return mat==='kevlar'||mat==='cuir'||mat==='mailles'?'torse_gilet':mat==='ceramique'?'torse_plaque':'torse_acier';
+  return base;
+}
+function impOpen(o={}){
+  impUI(); const d=IP.ui; IP.wasPaused=S.paused; S.paused=true; try{g3Unlock();}catch(_){}
+  if(o.weapon) IP.proj=impProjFor(o.weapon); if(o.tgt) IP.tgt=o.tgt; IP.ang=o.ang!==undefined?o.ang:(ITGT[IP.tgt].ang||0); IP.aim=0; IP.vk=1; IP.fast=IP.fast||1;
+  d.hidden=false; IP.on=true; impSize(); impFit(); impSync(); impScene(false,true); d.querySelector('#imp-res').hidden=true;
+  cancelAnimationFrame(IP.raf); IP.raf=requestAnimationFrame(impLoop);
+}
+function impClose(){ if(!IP.ui||IP.ui.hidden) return; IP.on=false; IP.run=false; cancelAnimationFrame(IP.raf); IP.ui.hidden=true; S.paused=IP.wasPaused||false; IP.x=IP.y=null; IP.cap=0; IP.img=null; }
+
 /* ---------- Interface : catalogue ---------- */
 const CS={cat:'armes',sub:'tout',sel:null,q:''}; let catWasPaused=false;
 function card(cat,it){
@@ -10546,11 +11016,12 @@ $('#z-follow').onclick=()=>setFollow(!cam.follow);
 const keys={};
 addEventListener('keydown',e=>{
   const k=e.key.toLowerCase(), open=!$('#cat').hidden;
+  if(IP.on){ if(k==='escape'){e.preventDefault(); impClose();} else if((k===' '||k==='enter')&&!(e.target.closest&&e.target.closest('select,button'))){e.preventDefault(); impFire();} return; }
   if(e.target.closest&&e.target.closest('input,textarea')){
     if(k==='escape'){e.preventDefault(); closeCat();}
     else if(k==='enter'&&CS.sel){e.preventDefault(); doAct(CS.sel.cat==='cartes'?'load':CS.sel.cat==='equip'?'equipTool':'take');}
     return;}
-  if(TITLE.on){ if(k==='enter'){e.preventDefault(); g3TitlePlay();} else if(k==='escape'){e.preventDefault(); showTitle(false);} return; }
+  if(TITLE.on&&!IP.on){ if(k==='enter'){e.preventDefault(); g3TitlePlay();} else if(k==='escape'){e.preventDefault(); showTitle(false);} return; }
   if(G3.on&&!open&&g3Key(e,true)) return;
   if(!open&&k==='escape'){e.preventDefault(); showTitle(true); return;}
   if(open){ if(k==='escape'||k==='m'){e.preventDefault();closeCat();} else if(k==='enter'&&CS.sel&&!e.target.closest('button')){e.preventDefault(); doAct(CS.sel.cat==='cartes'?'load':CS.sel.cat==='equip'?'equipTool':'take');} return; }
@@ -10616,6 +11087,7 @@ $('#title').addEventListener('click',e=>{
   if(t==='play') g3TitlePlay();
   else if(t==='profil'){ g3Exit(); showTitle(false); }
   else if(t==='safe') safeToggle();
+  else if(t==='imp') impOpen({weapon:curW()});
   else if(t==='quit') window.close();
   else {showTitle(false); openCat(t);}
 });
@@ -10633,6 +11105,7 @@ $('#b-menu').onclick=()=>showTitle(true);
   const _cc=closeCat; closeCat=function(){ const r=_cc(); if(G3.ui) g3Hint(); return r; };
   const _s3=setR3; setR3=function(on){ _s3(on); if(G3.on&&R3S.canvas) R3S.canvas.style.display='block'; };
   $('#recent').addEventListener('contextmenu',e=>{const b=e.target.closest('.rec'); if(b){e.preventDefault(); invRemove(+b.dataset.i);}});
+  $('#b-imp').onclick=()=>{ const r=G3.on&&G3.sel&&G3.rags.includes(G3.sel)?G3.sel:null; impOpen({weapon:S.hand.cat==='armes'?curW():null,tgt:r?impTgtFor('torse',r.parts.torse.armor&&r.parts.torse.armor.mat):undefined}); };
   const bs=$('#b-sang').onclick; $('#b-sang').onclick=()=>G3.on?g3CleanBlood():bs();
   const br=$('#b-reset').onclick; $('#b-reset').onclick=()=>{ if(G3.on){g3Build(G3.map); toast('Carte réinitialisée.');} else br(); };
   if(/[?&]g3/.test(location.search)) setTimeout(()=>g3Enter(/[?&]g3=plaine/.test(location.search)?'plaine3d':undefined),60);
@@ -10664,13 +11137,14 @@ function start(data){
   const frame=now=>{ try{ frame0(now); }catch(err){ frameErr(err); } requestAnimationFrame(frame); };
   const frame0=now=>{
     const el=Math.min(.05,(now-last)/1000); last=now; sfxCount=0;
+    if(IP.on) return;
     if(G3.on){try{if(!G3.manual) g3Frame(el);}catch(err){console.error(err); g3Exit(); frameErr(err);} return;}
     if(!S.paused){acc+=el; let n=0; while(acc>=DT&&n<4){tick(DT);acc-=DT;n++;} if(n===4) acc=0;} else acc=0;
     panKeys(el); if(TITLE.on) titleCam(el); updateCamera(el); draw(); renderMini(); uiT-=el; if(uiT<=0){uiT=.15;renderInsp();renderHud();renderFeed();renderCtx();renderBilan();}
   };
   requestAnimationFrame(frame);
 }
-if(/[?&]debug/.test(location.search)) window.__BL={S,G3,g3Enter,g3Exit,g3Fire,g3Throw,g3Build,g3Step,g3Spawn,g3Use,g3Frame,g3AimHit,GW,WEAPONS,MELEE,SOINS,CHARS,bodies,props,solids,gadgets,fx,ropes,cam,gun,get G(){return G},get WW(){return WW},loadMap,takeHand,fire,setQual,QL,showTitle,TITLE,explode,EXPLO,makeProp,flashes,R3,R3S,setR3,walls,liquids};
+if(/[?&]debug/.test(location.search)) window.__BL={S,G3,g3Enter,g3Exit,g3Fire,g3Throw,g3Build,g3Step,g3Spawn,g3Use,g3Frame,g3AimHit,GW,IP,impOpen,impFire,impClose,impScene,impStep,impStats,WEAPONS,MELEE,SOINS,CHARS,bodies,props,solids,gadgets,fx,ropes,cam,gun,get G(){return G},get WW(){return WW},loadMap,takeHand,fire,setQual,QL,showTitle,TITLE,explode,EXPLO,makeProp,flashes,R3,R3S,setR3,walls,liquids};
 new ResizeObserver(()=>{ if(W) resize(); }).observe(stage);
 if(hot&&typeof hot.ready==='function') hot.ready(start); else start(hot&&hot.data||{});
 })();
